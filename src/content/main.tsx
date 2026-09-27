@@ -18,21 +18,29 @@ type LoadState =
   | { status: 'ready'; engine: PerformanceEngine }
   | { status: 'error'; message: string };
 
-
 interface AppProps {
   initialSettings: ExtensionSettings;
   initialEnabled: boolean;
+  onlineFriendsHost: HTMLElement | null;
   onSettingsChange: (settings: ExtensionSettings) => void;
   onEnabledChange: (enabled: boolean) => void;
   loadState: LoadState;
 }
 
-function App({ initialSettings, initialEnabled, onSettingsChange, onEnabledChange, loadState }: AppProps) {
+function App({
+  initialSettings,
+  initialEnabled,
+  onlineFriendsHost,
+  onSettingsChange,
+  onEnabledChange,
+  loadState,
+}: AppProps) {
   const theme = useTheme();
 
   useEffect(() => {
     const host = document.getElementById('cfpm-compact');
     if (!host) return;
+
     host.style.cssText = [
       'box-sizing:border-box',
       'font-family:Arial,sans-serif',
@@ -45,6 +53,7 @@ function App({ initialSettings, initialEnabled, onSettingsChange, onEnabledChang
       'margin-top:10px',
       'max-width:920px',
     ].join(';');
+
     host.style.setProperty('--cfpm-bg', theme.bg);
     host.style.setProperty('--cfpm-text', theme.text);
     host.style.setProperty('--cfpm-border', theme.border);
@@ -77,6 +86,7 @@ function App({ initialSettings, initialEnabled, onSettingsChange, onEnabledChang
         engine={loadState.engine}
         initialSettings={initialSettings}
         initialEnabled={initialEnabled}
+        onlineFriendsHost={onlineFriendsHost}
         theme={theme}
         onSettingsChange={onSettingsChange}
         onEnabledChange={onEnabledChange}
@@ -86,14 +96,51 @@ function App({ initialSettings, initialEnabled, onSettingsChange, onEnabledChang
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', gap: 10, minHeight: 32, boxSizing: 'border-box' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: theme.muted, letterSpacing: '0.1em', cursor: 'default', userSelect: 'none', fontFamily: 'monospace', opacity: 0.8 }}>cfpm</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '5px 12px',
+          gap: 10,
+          minHeight: 32,
+          boxSizing: 'border-box',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: theme.muted,
+            letterSpacing: '0.1em',
+            cursor: 'default',
+            userSelect: 'none',
+            fontFamily: 'monospace',
+            opacity: 0.8,
+          }}
+        >
+          cfpm
+        </span>
       </div>
-      <div id="cfpm-header-divider" style={{ height: 1, background: theme.borderLight }} />
+
+      <div
+        id="cfpm-header-divider"
+        style={{ height: 1, background: theme.borderLight }}
+      />
+
       <div id="cfpm-body">
         <div style={{ padding: '0 14px 14px', boxSizing: 'border-box' }}>
-          <div style={{ color: theme.muted, fontSize: 12, marginTop: 2, marginBottom: 10 }}>
-            {loadState.status === 'loading' ? 'Loading…' : loadState.message}
+          <div
+            style={{
+              color: theme.muted,
+              fontSize: 12,
+              marginTop: 2,
+              marginBottom: 10,
+            }}
+          >
+            {loadState.status === 'loading'
+              ? 'Loading…'
+              : loadState.message}
           </div>
         </div>
       </div>
@@ -106,8 +153,14 @@ function createEngine(
   submissions: Awaited<ReturnType<typeof fetchUserDataset>>['submissions'],
   ratingHistory: Awaited<ReturnType<typeof fetchUserDataset>>['ratingHistory'],
 ): PerformanceEngine {
-  const contestMap = Object.fromEntries(contests.map(contest => [contest.id, contest])) as Record<number, CodeforcesContest>;
-  const ratedContestSet = new Set(ratingHistory.map(change => change.contestId));
+  const contestMap = Object.fromEntries(
+    contests.map(contest => [contest.id, contest]),
+  ) as Record<number, CodeforcesContest>;
+
+  const ratedContestSet = new Set(
+    ratingHistory.map(change => change.contestId),
+  );
+
   return new PerformanceEngine({
     contestMap,
     rawSubmissions: submissions,
@@ -116,41 +169,82 @@ function createEngine(
   });
 }
 
-function Root() {
+function Root({
+  onlineFriendsHost,
+}: {
+  onlineFriendsHost: HTMLElement | null;
+}) {
   const settings = useMemo(() => normalizeSettings(loadSettings()), []);
   const initialEnabled = useMemo(() => loadToggle(), []);
-  const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
+  const [loadState, setLoadState] = useState<LoadState>({
+    status: 'loading',
+  });
 
   useEffect(() => {
     let cancelled = false;
     const handle = (window.location.pathname.split('/')[2] || '').trim();
 
     if (!HANDLE_RE.test(handle)) {
-      setLoadState({ status: 'error', message: 'Could not detect a valid Codeforces username in the page URL.' });
-      return () => { cancelled = true; };
+      setLoadState({
+        status: 'error',
+        message:
+          'Could not detect a valid Codeforces username in the page URL.',
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
     (async () => {
       try {
-        const [contests, dataset] = await Promise.all([fetchContests(), fetchUserDataset(handle)]);
+        const [contests, dataset] = await Promise.all([
+          fetchContests(),
+          fetchUserDataset(handle),
+        ]);
+
         if (cancelled) return;
-        setLoadState({ status: 'ready', engine: createEngine(contests, dataset.submissions, dataset.ratingHistory) });
+
+        setLoadState({
+          status: 'ready',
+          engine: createEngine(
+            contests,
+            dataset.submissions,
+            dataset.ratingHistory,
+          ),
+        });
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error && error.message ? error.message : 'Could not connect to Codeforces. Please check your connection and try again.';
-        setLoadState({ status: 'error', message: message === 'unknown' ? 'Codeforces returned an error: unknown' : message.startsWith('Codeforces returned') ? message : 'Could not connect to Codeforces. Please check your connection and try again.' });
+
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Could not connect to Codeforces. Please check your connection and try again.';
+
+        setLoadState({
+          status: 'error',
+          message:
+            message === 'unknown'
+              ? 'Codeforces returned an error: unknown'
+              : message.startsWith('Codeforces returned')
+                ? message
+                : 'Could not connect to Codeforces. Please check your connection and try again.',
+        });
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const saveCurrentSettings = (next: ExtensionSettings): void => saveSettings(next);
+  const saveCurrentSettings = (next: ExtensionSettings): void =>
+    saveSettings(next);
 
   return (
     <App
       initialSettings={settings}
       initialEnabled={initialEnabled}
+      onlineFriendsHost={onlineFriendsHost}
       onSettingsChange={saveCurrentSettings}
       onEnabledChange={saveToggle}
       loadState={loadState}
@@ -160,14 +254,22 @@ function Root() {
 
 function installApp(): void {
   if (document.getElementById('cfpm-compact')) return;
+
   const handle = (window.location.pathname.split('/')[2] || '').trim();
   if (!HANDLE_RE.test(handle)) return;
 
-  const { host, appRoot, widthSource } = mountExtension();
+  const {
+    host,
+    appRoot,
+    onlineFriendsHost,
+    widthSource,
+  } = mountExtension();
+
   observeWidth(host, widthSource);
 
   const styleId = 'cfpm-toggle-style';
   const oldStyle = document.getElementById(styleId);
+
   if (!oldStyle) {
     const style = document.createElement('style');
     style.id = styleId;
@@ -175,7 +277,9 @@ function installApp(): void {
     document.head.appendChild(style);
   }
 
-  createRoot(appRoot).render(<Root />);
+  createRoot(appRoot).render(
+    <Root onlineFriendsHost={onlineFriendsHost} />,
+  );
 }
 
 installApp();
