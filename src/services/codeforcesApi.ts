@@ -45,11 +45,8 @@ export async function fetchUserDataset(handle: string): Promise<{
   return { submissions, ratingHistory };
 }
 
-// user.friends is an "authorized" CF API method. It has no separate public
-// login step here: called same-origin from codeforces.com, the browser's
-// existing CF session cookie is what authorizes it. If the viewer isn't
-// logged in to Codeforces, this call fails and the caller should treat that
-// as "can't show friends right now" rather than a fatal error.
+// user.friends is an "authorized" CF API method. It relies on the
+// authenticated Codeforces browser session.
 export async function fetchOnlineFriends(): Promise<string[]> {
   const data = await get<string[]>('/user.friends?onlyOnline=true', {
     credentials: 'include',
@@ -69,15 +66,20 @@ const USER_INFO_CHUNK_SIZE = 100;
 // of failing the whole lookup.
 export async function fetchUsersInfo(handles: string[]): Promise<CodeforcesUser[]> {
   if (handles.length === 0) return [];
+
   const chunks: string[][] = [];
   for (let i = 0; i < handles.length; i += USER_INFO_CHUNK_SIZE) {
     chunks.push(handles.slice(i, i + USER_INFO_CHUNK_SIZE));
   }
+
   const results = await Promise.all(
     chunks.map(async chunk => {
-      const data = await get<CodeforcesUser[]>(`/user.info?handles=${chunk.map(encodeURIComponent).join(';')}`);
+      const data = await get<CodeforcesUser[]>(
+        `/user.info?handles=${chunk.map(encodeURIComponent).join(';')}`,
+      );
       return data.status === 'OK' ? (data.result ?? []) : [];
     }),
   );
+
   return results.flat();
 }
