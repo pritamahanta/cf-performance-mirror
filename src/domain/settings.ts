@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   hideAC: false, hideTags: false, hideRatings: false, solvedOnly: false,
   minAttempts: 1, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
   tagFilters: [], tableVisible: true, customContestFrom: '', customContestTo: '',
+  friendsVisible: true,
 };
 
 export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
@@ -29,5 +30,6 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     tableVisible: saved.tableVisible ?? DEFAULT_SETTINGS.tableVisible,
     customContestFrom: saved.customContestFrom ?? DEFAULT_SETTINGS.customContestFrom,
     customContestTo: saved.customContestTo ?? DEFAULT_SETTINGS.customContestTo,
+    friendsVisible: saved.friendsVisible ?? DEFAULT_SETTINGS.friendsVisible,
   };
 }
