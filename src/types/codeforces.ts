@@ -52,3 +52,12 @@ export interface CodeforcesApiResponse<T> {
   result?: T;
   comment?: string;
 }
+
+export interface CodeforcesUser {
+  handle: string;
+  rating?: number;
+  maxRating?: number;
+  rank?: string;
+  maxRank?: string;
+  lastOnlineTimeSeconds?: number;
+}
