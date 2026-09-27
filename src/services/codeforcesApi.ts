@@ -51,10 +51,14 @@ export async function fetchUserDataset(handle: string): Promise<{
 // logged in to Codeforces, this call fails and the caller should treat that
 // as "can't show friends right now" rather than a fatal error.
 export async function fetchOnlineFriends(): Promise<string[]> {
-  const data = await get<string[]>('/user.friends?onlyOnline=true');
+  const data = await get<string[]>('/user.friends?onlyOnline=true', {
+    credentials: 'include',
+  });
+
   if (data.status !== 'OK') {
     throw new Error(data.comment || 'unknown');
   }
+
   return data.result ?? [];
 }
 
