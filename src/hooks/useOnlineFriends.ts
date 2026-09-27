@@ -1,65 +1,220 @@
-import { useEffect, useRef, useState } from 'react';
-import { fetchOnlineFriends, fetchUsersInfo } from '../services/codeforcesApi';
-import { mergeFriendsWithInfo } from '../domain/friends';
-import type { OnlineFriend } from '../domain/friends';
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  fetchOnlineFriends,
+  fetchUsersInfo,
+} from '../services/codeforcesApi';
+
+import {
+  mergeFriendsWithInfo,
+} from '../domain/friends';
+
+import type {
+  OnlineFriend,
+} from '../domain/friends';
 
 const REFRESH_INTERVAL_MS = 60_000;
-const LOAD_ERROR_MESSAGE = "Couldn't load your online friends. Make sure you're logged in to Codeforces.";
+
+/*
+ * A friend is considered online when Codeforces has seen
+ * them online within the last 5 minutes.
+ */
+const ONLINE_THRESHOLD_SECONDS =
+  5 * 60;
+
+const LOAD_ERROR_MESSAGE =
+  "Couldn't load your online friends. Make sure you're logged in to Codeforces.";
 
 export type OnlineFriendsState =
-  | { status: 'loading' }
-  | { status: 'ready'; friends: OnlineFriend[]; updatedAt: number; refreshing: boolean }
-  | { status: 'error'; message: string };
+  | {
+      status: 'loading';
+    }
+  | {
+      status: 'ready';
+      friends: OnlineFriend[];
+      updatedAt: number;
+      refreshing: boolean;
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
 
 interface Result {
   state: OnlineFriendsState;
   refresh: () => void;
 }
 
-// `active` gates both the fetch and the polling interval, so the panel does
-// no network work at all while the user has it hidden via settings.
-export function useOnlineFriends(active: boolean): Result {
-  const [state, setState] = useState<OnlineFriendsState>({ status: 'loading' });
-  const [tick, setTick] = useState(0);
-  const stateRef = useRef(state);
+export function useOnlineFriends(
+  active: boolean,
+): Result {
+  const [state, setState] =
+    useState<OnlineFriendsState>({
+      status: 'loading',
+    });
+
+  const [tick, setTick] =
+    useState(0);
+
+  const stateRef =
+    useRef(state);
+
   stateRef.current = state;
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      return;
+    }
+
     let cancelled = false;
 
-    const current = stateRef.current;
-    setState(current.status === 'ready' ? { ...current, refreshing: true } : { status: 'loading' });
+    const current =
+      stateRef.current;
+
+    /*
+     * Keep the existing list visible while refreshing.
+     */
+    setState(
+      current.status === 'ready'
+        ? {
+            ...current,
+            refreshing: true,
+          }
+        : {
+            status: 'loading',
+          },
+    );
 
     (async () => {
       try {
-        const handles = await fetchOnlineFriends();
-        const infos = handles.length ? await fetchUsersInfo(handles) : [];
-        if (cancelled) return;
+        /*
+         * This returns the user's complete friend list
+         * from the authenticated Codeforces /friends page.
+         */
+        const handles =
+          await fetchOnlineFriends();
+
+        /*
+         * Fetch rating + lastOnlineTimeSeconds for all friends.
+         */
+        const infos =
+          handles.length > 0
+            ? await fetchUsersInfo(handles)
+            : [];
+
+        const nowSeconds =
+          Math.floor(
+            Date.now() / 1000,
+          );
+
+        /*
+         * Only keep friends whose last observed online time
+         * is within the last 5 minutes.
+         */
+        const onlineInfos =
+          infos.filter(info => {
+            const lastOnline =
+              info.lastOnlineTimeSeconds;
+
+            if (
+              typeof lastOnline !==
+              'number'
+            ) {
+              return false;
+            }
+
+            const elapsed =
+              nowSeconds -
+              lastOnline;
+
+            return (
+              elapsed >= 0 &&
+              elapsed <
+                ONLINE_THRESHOLD_SECONDS
+            );
+          });
+
+        /*
+         * Use the handles from the filtered user objects,
+         * not the complete friend list.
+         */
+        const onlineHandles =
+          onlineInfos.map(
+            info => info.handle,
+          );
+
+        if (cancelled) {
+          return;
+        }
+
         setState({
           status: 'ready',
-          friends: mergeFriendsWithInfo(handles, infos),
+          friends:
+            mergeFriendsWithInfo(
+              onlineHandles,
+              onlineInfos,
+            ),
           updatedAt: Date.now(),
           refreshing: false,
         });
       } catch {
-        if (cancelled) return;
-        // A refresh failure keeps showing the last good list instead of
-        // replacing it with an error; only a failed *first* load shows one.
-        setState(previous => (previous.status === 'ready'
-          ? { ...previous, refreshing: false }
-          : { status: 'error', message: LOAD_ERROR_MESSAGE }));
+        if (cancelled) {
+          return;
+        }
+
+        /*
+         * During a refresh, preserve the previous successful
+         * list rather than replacing it with an error.
+         */
+        setState(previous =>
+          previous.status ===
+          'ready'
+            ? {
+                ...previous,
+                refreshing: false,
+              }
+            : {
+                status: 'error',
+                message:
+                  LOAD_ERROR_MESSAGE,
+              },
+        );
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [active, tick]);
 
   useEffect(() => {
-    if (!active) return;
-    const interval = window.setInterval(() => setTick(count => count + 1), REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    if (!active) {
+      return;
+    }
+
+    const interval =
+      window.setInterval(() => {
+        setTick(
+          count => count + 1,
+        );
+      }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(
+        interval,
+      );
+    };
   }, [active]);
 
-  return { state, refresh: () => setTick(count => count + 1) };
+  return {
+    state,
+    refresh: () =>
+      setTick(
+        count => count + 1,
+      ),
+  };
 }
