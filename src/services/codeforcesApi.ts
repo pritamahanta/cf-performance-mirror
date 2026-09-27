@@ -10,13 +10,24 @@ const API_BASE = 'https://codeforces.com/api';
 
 async function get<T>(
   path: string,
+  init?: RequestInit,
 ): Promise<CodeforcesApiResponse<T>> {
-  const response = await fetch(`${API_BASE}${path}`);
-  return response.json() as Promise<CodeforcesApiResponse<T>>;
+  const response = await fetch(
+    `${API_BASE}${path}`,
+    init,
+  );
+
+  return response.json() as Promise<
+    CodeforcesApiResponse<T>
+  >;
 }
 
 export async function fetchContests(): Promise<CodeforcesContest[]> {
-  const data = await get<CodeforcesContest[]>('/contest.list');
+  const data =
+    await get<CodeforcesContest[]>(
+      '/contest.list',
+    );
+
   return data.status === 'OK'
     ? (data.result ?? [])
     : [];
@@ -25,9 +36,10 @@ export async function fetchContests(): Promise<CodeforcesContest[]> {
 export async function fetchUserRating(
   handle: string,
 ): Promise<CodeforcesRatingChange[]> {
-  const data = await get<CodeforcesRatingChange[]>(
-    `/user.rating?handle=${encodeURIComponent(handle)}`,
-  );
+  const data =
+    await get<CodeforcesRatingChange[]>(
+      `/user.rating?handle=${encodeURIComponent(handle)}`,
+    );
 
   return data.status === 'OK'
     ? (data.result ?? [])
@@ -43,7 +55,9 @@ export async function fetchUserSubmissions(
     );
 
   if (data.status !== 'OK') {
-    throw new Error(data.comment || 'unknown');
+    throw new Error(
+      data.comment || 'unknown',
+    );
   }
 
   return data.result ?? [];
@@ -70,18 +84,21 @@ export async function fetchUserDataset(
 }
 
 /*
- * Codeforces' user.friends API method requires API authorization.
- * Instead of embedding an API secret in the extension, read the
- * authenticated /friends page using the user's existing Codeforces
- * browser session.
+ * user.friends is an authorized API method, so it cannot be
+ * called directly from the extension without an API key/secret.
+ *
+ * Instead, read the authenticated /friends page using the
+ * user's existing Codeforces browser session.
  */
 export async function fetchOnlineFriends(): Promise<string[]> {
-  const response = await fetch(
-    'https://codeforces.com/friends',
-    {
-      credentials: 'include',
-    },
-  );
+  const response =
+    await fetch(
+      'https://codeforces.com/friends',
+      {
+        credentials: 'include',
+        cache: 'no-store',
+      },
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -89,32 +106,40 @@ export async function fetchOnlineFriends(): Promise<string[]> {
     );
   }
 
-  const html = await response.text();
+  const html =
+    await response.text();
 
-  const doc = new DOMParser().parseFromString(
-    html,
-    'text/html',
-  );
+  const doc =
+    new DOMParser().parseFromString(
+      html,
+      'text/html',
+    );
 
   /*
-   * The friends page contains the main friends table.
-   * Select the largest table containing profile links so
-   * unrelated sidebar profile links are ignored.
+   * The main friends table is the largest table
+   * containing Codeforces profile links.
    */
-  const tables = Array.from(
-    doc.querySelectorAll('table'),
-  )
-    .map(table => ({
-      table,
-      count:
-        table.querySelectorAll(
-          'a[href*="/profile/"]',
-        ).length,
-    }))
-    .filter(item => item.count > 0)
-    .sort((a, b) => b.count - a.count);
+  const tables =
+    Array.from(
+      doc.querySelectorAll('table'),
+    )
+      .map(table => ({
+        table,
+        count:
+          table.querySelectorAll(
+            'a[href*="/profile/"]',
+          ).length,
+      }))
+      .filter(
+        item => item.count > 0,
+      )
+      .sort(
+        (a, b) =>
+          b.count - a.count,
+      );
 
-  const friendsTable = tables[0]?.table;
+  const friendsTable =
+    tables[0]?.table;
 
   if (!friendsTable) {
     throw new Error(
@@ -122,24 +147,32 @@ export async function fetchOnlineFriends(): Promise<string[]> {
     );
   }
 
-  const handles = Array.from(
-    new Set(
-      Array.from(
-        friendsTable.querySelectorAll<HTMLAnchorElement>(
-          'a[href*="/profile/"]',
-        ),
-      )
-        .map(link => {
-          const match =
-            link.getAttribute('href')?.match(
-              /\/profile\/([^/?#]+)/,
-            );
+  const handles =
+    Array.from(
+      new Set(
+        Array.from(
+          friendsTable.querySelectorAll<HTMLAnchorElement>(
+            'a[href*="/profile/"]',
+          ),
+        )
+          .map(link => {
+            const href =
+              link.getAttribute(
+                'href',
+              );
 
-          return match?.[1] ?? '';
-        })
-        .filter(Boolean),
-    ),
-  );
+            const match =
+              href?.match(
+                /\/profile\/([^/?#]+)/,
+              );
+
+            return (
+              match?.[1] ?? ''
+            );
+          })
+          .filter(Boolean),
+      ),
+    );
 
   if (handles.length === 0) {
     throw new Error(
@@ -153,7 +186,9 @@ export async function fetchOnlineFriends(): Promise<string[]> {
 const USER_INFO_CHUNK_SIZE = 100;
 
 /*
- * Keep requests chunked so the URL does not become too large.
+ * Fetch public information for friends in chunks.
+ * cache: 'no-store' is important because lastOnlineTimeSeconds
+ * needs to be as fresh as possible.
  */
 export async function fetchUsersInfo(
   handles: string[],
@@ -177,20 +212,29 @@ export async function fetchUsersInfo(
     );
   }
 
-  const results = await Promise.all(
-    chunks.map(async chunk => {
-      const data =
-        await get<CodeforcesUser[]>(
-          `/user.info?handles=${chunk
-            .map(encodeURIComponent)
-            .join(';')}`,
-        );
+  const results =
+    await Promise.all(
+      chunks.map(
+        async chunk => {
+          const data =
+            await get<CodeforcesUser[]>(
+              `/user.info?handles=${chunk
+                .map(
+                  encodeURIComponent,
+                )
+                .join(';')}`,
+              {
+                cache: 'no-store',
+              },
+            );
 
-      return data.status === 'OK'
-        ? (data.result ?? [])
-        : [];
-    }),
-  );
+          return data.status ===
+            'OK'
+            ? (data.result ?? [])
+            : [];
+        },
+      ),
+    );
 
   return results.flat();
 }
