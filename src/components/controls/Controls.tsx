@@ -228,6 +228,55 @@ export function Controls({
             </svg>
           </button>
 
+          <button
+            className={`cfpm-icon-btn ${settings.friendsVisible
+              ? 'active'
+              : ''
+              }`}
+            title={
+              settings.friendsVisible
+                ? 'Hide online friends'
+                : 'Show online friends'
+            }
+            style={{
+              background:
+                settings.friendsVisible
+                  ? theme.btnActiveBg
+                  : theme.btnBg,
+              color:
+                settings.friendsVisible
+                  ? theme.btnActiveText
+                  : theme.muted,
+              border: `1px solid ${settings.friendsVisible
+                ? theme.btnActiveBorder
+                : theme.btnBorder
+                }`,
+            }}
+            onClick={() =>
+              onChange({
+                friendsVisible:
+                  !settings.friendsVisible,
+              })
+            }
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="6" cy="5.2" r="2.2" />
+              <path d="M1.6 13.2c0-2.4 1.9-3.8 4.4-3.8s4.4 1.4 4.4 3.8" />
+              <circle cx="12.1" cy="6.1" r="1.7" />
+              <path d="M10.3 9.2c1.8 0.3 3.1 1.5 3.1 4" />
+            </svg>
+          </button>
+
           <TimelineSelector
             value={settings.timeline}
             customStart={settings.customStart}
