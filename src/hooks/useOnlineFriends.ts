@@ -24,11 +24,14 @@ const REFRESH_INTERVAL_MS =
  * Codeforces exposes lastOnlineTimeSeconds
  * through user.info.
  *
- * Treat a user seen within the last 5 minutes
- * as online.
+ * Codeforces' own site treats a user as "online"
+ * if seen within the last 15 minutes (not 5) -
+ * matching that window here is what keeps this
+ * list in sync with what codeforces.com itself
+ * shows as online.
  */
 const ONLINE_THRESHOLD_SECONDS =
-  5 * 60;
+  15 * 60;
 
 const LOAD_ERROR_MESSAGE =
   "Couldn't load your online friends. Make sure you're logged in to Codeforces.";
@@ -121,7 +124,7 @@ export function useOnlineFriends(
         /*
          * Match Codeforces' commonly used
          * "online now" interpretation:
-         * last seen within 5 minutes.
+         * last seen within 15 minutes.
          *
          * Do not require diff >= 0 because
          * the client clock and server clock may

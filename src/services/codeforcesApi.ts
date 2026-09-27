@@ -129,14 +129,25 @@ export async function fetchOnlineFriends(): Promise<
     );
 
   /*
-   * Pick the table with the largest number
-   * of profile links. That is the main friends
-   * table on the Codeforces friends page.
+   * Codeforces renders every real data table
+   * (friends, standings, submissions, rating
+   * changes, ...) with the "tablesorter" class.
+   * Sidebar boxes (Top rated, Recent actions,
+   * etc.) are plain divs, not tables, but they
+   * can still contain "/profile/" links, so a
+   * bare "most profile links" comparison across
+   * *all* tables on the page can grab the wrong
+   * one when the friends list itself is short.
+   *
+   * Prefer an actual tablesorter table first;
+   * only fall back to the old "largest number of
+   * profile links" heuristic if none is found, so
+   * behavior is unchanged in that edge case.
    */
-  const tables =
+  const tablesorterTables =
     Array.from(
       doc.querySelectorAll(
-        'table',
+        'table.tablesorter',
       ),
     )
       .map(table => ({
@@ -154,6 +165,32 @@ export async function fetchOnlineFriends(): Promise<
           b.count -
           a.count,
       );
+
+  const tables =
+    tablesorterTables.length >
+    0
+      ? tablesorterTables
+      : Array.from(
+          doc.querySelectorAll(
+            'table',
+          ),
+        )
+          .map(table => ({
+            table,
+            count:
+              table.querySelectorAll(
+                'a[href*="/profile/"]',
+              ).length,
+          }))
+          .filter(
+            item =>
+              item.count > 0,
+          )
+          .sort(
+            (a, b) =>
+              b.count -
+              a.count,
+          );
 
   const friendsTable =
     tables[0]?.table;
