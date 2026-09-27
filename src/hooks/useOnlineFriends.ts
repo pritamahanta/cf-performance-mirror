@@ -17,11 +17,12 @@ import type {
   OnlineFriend,
 } from '../domain/friends';
 
-const REFRESH_INTERVAL_MS = 60_000;
+const REFRESH_INTERVAL_MS =
+  60_000;
 
 /*
- * A friend is considered online when Codeforces has seen
- * them online within the last 5 minutes.
+ * Consider a friend online when Codeforces has
+ * seen them online within the last 5 minutes.
  */
 const ONLINE_THRESHOLD_SECONDS =
   5 * 60;
@@ -63,7 +64,8 @@ export function useOnlineFriends(
   const stateRef =
     useRef(state);
 
-  stateRef.current = state;
+  stateRef.current =
+    state;
 
   useEffect(() => {
     if (!active) {
@@ -75,11 +77,9 @@ export function useOnlineFriends(
     const current =
       stateRef.current;
 
-    /*
-     * Keep the existing list visible while refreshing.
-     */
     setState(
-      current.status === 'ready'
+      current.status ===
+        'ready'
         ? {
             ...current,
             refreshing: true,
@@ -92,18 +92,21 @@ export function useOnlineFriends(
     (async () => {
       try {
         /*
-         * This returns the user's complete friend list
-         * from the authenticated Codeforces /friends page.
+         * Get all handles from the authenticated
+         * Codeforces /friends page.
          */
         const handles =
           await fetchOnlineFriends();
 
         /*
-         * Fetch rating + lastOnlineTimeSeconds for all friends.
+         * Get fresh public information for those
+         * handles, including lastOnlineTimeSeconds.
          */
         const infos =
           handles.length > 0
-            ? await fetchUsersInfo(handles)
+            ? await fetchUsersInfo(
+                handles,
+              )
             : [];
 
         const nowSeconds =
@@ -112,44 +115,46 @@ export function useOnlineFriends(
           );
 
         /*
-         * Only keep friends whose last observed online time
-         * is within the last 5 minutes.
+         * Keep only users whose last online time
+         * is within the configured threshold.
+         *
+         * We intentionally do not require diff >= 0,
+         * because the client/server clocks can differ
+         * slightly.
          */
         const onlineInfos =
-          infos.filter(info => {
-            const lastOnline =
-              info.lastOnlineTimeSeconds;
+          infos.filter(
+            info => {
+              const lastOnline =
+                info.lastOnlineTimeSeconds;
 
-            if (
-              typeof lastOnline !==
-              'number'
-            ) {
-              return false;
-            }
+              if (
+                typeof lastOnline !==
+                'number'
+              ) {
+                return false;
+              }
 
-            const elapsed =
-              nowSeconds -
-              lastOnline;
+              const diff =
+                nowSeconds -
+                lastOnline;
 
-            return (
-              elapsed >= 0 &&
-              elapsed <
+              return (
+                diff <
                 ONLINE_THRESHOLD_SECONDS
-            );
-          });
-
-        /*
-         * Use the handles from the filtered user objects,
-         * not the complete friend list.
-         */
-        const onlineHandles =
-          onlineInfos.map(
-            info => info.handle,
+              );
+            },
           );
 
         if (cancelled) {
           return;
         }
+
+        const onlineHandles =
+          onlineInfos.map(
+            info =>
+              info.handle,
+          );
 
         setState({
           status: 'ready',
@@ -158,7 +163,8 @@ export function useOnlineFriends(
               onlineHandles,
               onlineInfos,
             ),
-          updatedAt: Date.now(),
+          updatedAt:
+            Date.now(),
           refreshing: false,
         });
       } catch {
@@ -167,21 +173,22 @@ export function useOnlineFriends(
         }
 
         /*
-         * During a refresh, preserve the previous successful
-         * list rather than replacing it with an error.
+         * Keep the previous successful list
+         * during a refresh failure.
          */
-        setState(previous =>
-          previous.status ===
-          'ready'
-            ? {
-                ...previous,
-                refreshing: false,
-              }
-            : {
-                status: 'error',
-                message:
-                  LOAD_ERROR_MESSAGE,
-              },
+        setState(
+          previous =>
+            previous.status ===
+            'ready'
+              ? {
+                  ...previous,
+                  refreshing: false,
+                }
+              : {
+                  status: 'error',
+                  message:
+                    LOAD_ERROR_MESSAGE,
+                },
         );
       }
     })();
@@ -197,11 +204,14 @@ export function useOnlineFriends(
     }
 
     const interval =
-      window.setInterval(() => {
-        setTick(
-          count => count + 1,
-        );
-      }, REFRESH_INTERVAL_MS);
+      window.setInterval(
+        () => {
+          setTick(
+            count => count + 1,
+          );
+        },
+        REFRESH_INTERVAL_MS,
+      );
 
     return () => {
       window.clearInterval(
