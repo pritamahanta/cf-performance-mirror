@@ -1,255 +1,418 @@
-import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import type { CSSProperties } from 'react';
-import type { PerformanceEngine } from '../domain/performanceEngine';
+import { useState } from 'react';
+import type { MouseEvent } from 'react';
+import type { Category } from '../types/settings';
+import type { ModeData, DeltaInfo } from '../types/performance';
 import type { Theme } from '../domain/theme';
-import type { ExtensionSettings } from '../types/settings';
-import type { ResolvedTimeline } from '../types/performance';
-import { resolveTimelineValue, timelineLabel } from '../domain/timeline';
-import { usePerformanceData } from '../hooks/usePerformanceData';
-import { PerformanceTable } from './PerformanceTable';
-import { Controls } from './controls/Controls';
-import { FrictionPanel } from './friction/FrictionPanel';
-import { OnlineFriendsPanel } from './friends/OnlineFriendsPanel';
+import { buildTableModel } from '../domain/table';
+import { SubmissionPopup } from './friction/SubmissionPopup';
 
 interface Props {
-  engine: PerformanceEngine;
-  initialSettings: ExtensionSettings;
-  initialEnabled: boolean;
-  onlineFriendsHost: HTMLElement | null;
+  modeData: ModeData;
+  category: Category;
+  deltaInfo: DeltaInfo | null;
   theme: Theme;
-  onSettingsChange: (settings: ExtensionSettings) => void;
-  onEnabledChange: (enabled: boolean) => void;
+  popupSort: 'time' | 'contest';
+  onPopupSortChange: (mode: 'time' | 'contest') => void;
 }
 
-function timelineDisplayLabel(settings: ExtensionSettings): string {
-  if (
-    settings.timeline === 'custom' &&
-    settings.customStart &&
-    settings.customEnd
-  ) {
-    return `${settings.customStart} → ${settings.customEnd}`;
-  }
+type PopupState = {
+  anchor: HTMLElement;
+  label: string;
+  ids: number[];
+  contestId: number;
+  bg: string;
+  fg: string;
+};
 
-  if (
-    settings.timeline === 'cc' &&
-    settings.customContestFrom &&
-    settings.customContestTo
-  ) {
-    const from = Number.parseInt(settings.customContestFrom, 10);
-    const to = Number.parseInt(settings.customContestTo, 10);
-
-    if (!Number.isNaN(from) && !Number.isNaN(to)) {
-      const lo = Math.min(from, to);
-      const hi = Math.max(from, to);
-
-      return lo === 1
-        ? `Last ${hi} contests`
-        : `Contests ${lo}–${hi} most recent`;
-    }
-
-    return 'Custom contests';
-  }
-
-  return timelineLabel(settings.timeline);
-}
-
-export function PerformanceMirror({
-  engine,
-  initialSettings,
-  initialEnabled,
-  onlineFriendsHost,
+export function PerformanceTable({
+  modeData,
+  category,
+  deltaInfo,
   theme,
-  onSettingsChange,
-  onEnabledChange,
+  popupSort,
+  onPopupSortChange,
 }: Props) {
-  const [settings, setSettings] = useState(initialSettings);
-  const [enabled, setEnabled] = useState(initialEnabled);
-  const [popupSort, setPopupSort] = useState<'time' | 'contest'>('time');
+  const model = buildTableModel(modeData, category);
+  const [popup, setPopup] = useState<PopupState | null>(null);
 
-  const resolvedTimeline: ResolvedTimeline = useMemo(
-    () =>
-      resolveTimelineValue(
-        settings.timeline,
-        settings.customStart,
-        settings.customEnd,
-        settings.customContestFrom,
-        settings.customContestTo,
-      ),
-    [
-      settings.timeline,
-      settings.customStart,
-      settings.customEnd,
-      settings.customContestFrom,
-      settings.customContestTo,
-    ],
-  );
+  const openPopup = (
+    event: MouseEvent<HTMLElement>,
+    label: string,
+    ids: number[],
+    contestId: number,
+    bg: string,
+    fg: string,
+  ) => {
+    if (!ids.length) return;
 
-  const { modeData, deltaInfoByCategory } = usePerformanceData(
-    engine,
-    settings.mode,
-    resolvedTimeline,
-  );
+    const anchor = event.currentTarget;
 
-  const deltaInfo = deltaInfoByCategory[settings.category];
-
-  useEffect(() => {
-    onSettingsChange(settings);
-  }, [settings, onSettingsChange]);
-
-  const updateSettings = (patch: Partial<ExtensionSettings>) => {
-    setSettings(current => ({ ...current, ...patch }));
-  };
-
-  const infoText = useMemo(() => {
-    const count =
-      modeData.categoryContestCount[settings.category] || 0;
-
-    let text =
-      `${modeData.participatedCount} contests total · ` +
-      `${settings.category}: ${count}`;
-
-    if (deltaInfo?.count > 0) {
-      text +=
-        ` · Δ ${deltaInfo.delta >= 0 ? '+' : ''}${deltaInfo.delta}` +
-        ` (${deltaInfo.count} rated)`;
-    }
-
-    const mode =
-      settings.mode[0].toUpperCase() + settings.mode.slice(1);
-
-    return `${text} · ${mode} · ${timelineDisplayLabel(settings)}`;
-  }, [modeData, settings, deltaInfo]);
-
-  const cardStyle: CSSProperties = {
-    boxSizing: 'border-box',
-    fontFamily: 'Arial, sans-serif',
-    fontSize: 14,
-    color: theme.text,
-    background: theme.bg,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 5,
-    padding: 0,
-    marginTop: 10,
-    maxWidth: 920,
+    setPopup(current =>
+      current?.anchor === anchor
+        ? null
+        : {
+            anchor,
+            label,
+            ids,
+            contestId,
+            bg,
+            fg,
+          },
+    );
   };
 
   return (
     <>
-      <div
+      <table
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '5px 12px',
-          gap: 10,
-          minHeight: 32,
-          boxSizing: 'border-box',
+          borderCollapse: 'collapse',
+          fontSize: 13,
+          width: '100%',
         }}
       >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: theme.muted,
-            letterSpacing: '0.1em',
-            cursor: 'default',
-            userSelect: 'none',
-            fontFamily: 'monospace',
-            opacity: enabled ? 0.8 : 0.4,
-          }}
-        >
-          cfpm
-        </span>
+        <thead>
+          <tr>
+            <th
+              style={{
+                textAlign: 'left',
+                padding: '5px 12px',
+                borderBottom: `2px solid ${theme.borderLight}`,
+                verticalAlign: 'middle',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    color: theme.tableHeaderText,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {category}
+                </span>
 
-        <button
-          id="cfpm-chevron-btn"
-          className={enabled ? '' : 'collapsed'}
-          title={enabled ? 'Collapse' : 'Expand'}
-          aria-label={
-            enabled
-              ? 'Collapse CF Performance Mirror'
-              : 'Expand CF Performance Mirror'
-          }
-          style={{ color: theme.muted }}
-          onClick={() => {
-            const next = !enabled;
-            setEnabled(next);
-            onEnabledChange(next);
-          }}
-        >
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 13 13"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M2.5 4.5l4 4 4-4" />
-          </svg>
-        </button>
-      </div>
+                {deltaInfo && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 3,
+                      marginLeft: 0,
+                      padding: '1px 7px 1px 5px',
+                      borderRadius: 10,
+                      font: '700 11px monospace',
+                      background:
+                        deltaInfo.delta > 0
+                          ? theme.isDark
+                            ? '#0d2318'
+                            : '#e6f4ea'
+                          : deltaInfo.delta < 0
+                            ? theme.isDark
+                              ? '#2a1212'
+                              : '#fdecea'
+                            : theme.isDark
+                              ? '#222'
+                              : '#f5f5f5',
+                      color:
+                        deltaInfo.delta > 0
+                          ? '#27ae60'
+                          : deltaInfo.delta < 0
+                            ? '#e74c3c'
+                            : theme.muted,
+                    }}
+                    title={
+                      deltaInfo.count > 0
+                        ? `Rating change in ${deltaInfo.count} rated ${category} contest${deltaInfo.count !== 1 ? 's' : ''} (selected period)`
+                        : `No rated ${category} contests in the selected period`
+                    }
+                  >
+                    <span>Δ</span>
+                    <span>
+                      {deltaInfo.delta > 0 ? '+' : ''}
+                      {deltaInfo.delta}
+                    </span>
+                  </span>
+                )}
+              </div>
+            </th>
 
-      <div
-        id="cfpm-header-divider"
-        style={{ background: theme.borderLight }}
-      />
+            {model.indices.map(index => (
+              <th
+                key={index}
+                style={{
+                  textAlign: 'center',
+                  padding: '5px 14px',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: theme.tableHeaderText,
+                  borderBottom: `2px solid ${theme.borderLight}`,
+                }}
+              >
+                {index}
+              </th>
+            ))}
+          </tr>
+        </thead>
 
-      <div
-        id="cfpm-body"
-        className={enabled ? '' : 'cfpm-collapsed'}
-      >
-        <Controls
-          settings={settings}
+        <tbody>
+          <tr>
+            <td
+              style={{
+                textAlign: 'left',
+                padding: '6px 14px',
+                fontSize: 11,
+                color: theme.muted,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Avg. time (min)
+            </td>
+
+            {model.rows.map(cell => (
+              <td
+                key={cell.index}
+                style={{
+                  textAlign: 'center',
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  color: theme.accentBlue,
+                  fontWeight: 700,
+                  borderTop: `1px solid ${theme.borderLighter}`,
+                }}
+              >
+                {cell.averageTime ?? '—'}
+              </td>
+            ))}
+          </tr>
+
+          <tr>
+            <td
+              style={{
+                textAlign: 'left',
+                padding: '6px 14px',
+                fontSize: 11,
+                color: theme.muted,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Median time (min)
+            </td>
+
+            {model.rows.map(cell => (
+              <td
+                key={cell.index}
+                style={{
+                  textAlign: 'center',
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  color: '#6b4fa0',
+                  fontWeight: 700,
+                  borderTop: `1px solid ${theme.borderLighter}`,
+                }}
+              >
+                {cell.medianTime ?? '—'}
+              </td>
+            ))}
+          </tr>
+
+          <tr>
+            <td
+              style={{
+                textAlign: 'left',
+                padding: '6px 14px',
+                fontSize: 11,
+                color: theme.muted,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Solved
+            </td>
+
+            {model.rows.map(cell => {
+              const display =
+                cell.attempts > 0 && cell.solved === 0
+                  ? `0 / ${cell.attempts}`
+                  : String(cell.solved);
+
+              const clickable = cell.acIds.length > 0;
+
+              return (
+                <td
+                  key={cell.index}
+                  className={
+                    cell.attempts > 0 && cell.solved === 0
+                      ? 'failure-cell'
+                      : clickable
+                        ? 'clickable'
+                        : undefined
+                  }
+                  style={{
+                    textAlign: 'center',
+                    padding: '6px 14px',
+                    fontSize: 13,
+                    color:
+                      cell.attempts > 0 && cell.solved === 0
+                        ? '#e74c3c'
+                        : theme.tableCellText,
+                    fontWeight:
+                      cell.attempts > 0 && cell.solved === 0
+                        ? 700
+                        : undefined,
+                    borderTop: `1px solid ${theme.borderLighter}`,
+                    cursor: clickable ? 'pointer' : 'default',
+                    textDecoration: clickable ? 'underline' : undefined,
+                    textDecorationStyle: clickable ? 'dotted' : undefined,
+                    textUnderlineOffset: clickable ? 2 : undefined,
+                  }}
+                  title={
+                    cell.acIds.length
+                      ? `Click to view ${cell.acIds.length} AC submissions for problem ${cell.index}`
+                      : cell.attempts > 0 && cell.solved === 0
+                        ? `Never solved — ${cell.attempts} submission${cell.attempts !== 1 ? 's' : ''}`
+                        : undefined
+                  }
+                  onClick={event =>
+                    openPopup(
+                      event,
+                      'AC',
+                      cell.acIds,
+                      0,
+                      theme.solvedBadge,
+                      theme.solvedBadgeText,
+                    )
+                  }
+                >
+                  {display}
+                </td>
+              );
+            })}
+          </tr>
+
+          <tr>
+            <td
+              style={{
+                textAlign: 'left',
+                padding: '6px 14px',
+                fontSize: 11,
+                color: theme.muted,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Attempts
+            </td>
+
+            {model.rows.map(cell => {
+              const clickable = cell.wrongIds.length > 0;
+
+              return (
+                <td
+                  key={cell.index}
+                  style={{
+                    textAlign: 'center',
+                    padding: '6px 14px',
+                    fontSize: 13,
+                    color: theme.tableCellText,
+                    borderTop: `1px solid ${theme.borderLighter}`,
+                    cursor: clickable ? 'pointer' : 'default',
+                    textDecoration: clickable ? 'underline' : undefined,
+                    textDecorationStyle: clickable ? 'dotted' : undefined,
+                    textUnderlineOffset: clickable ? 2 : undefined,
+                  }}
+                  title={
+                    clickable
+                      ? `Click to view ${cell.wrongIds.length} wrong submissions for problem ${cell.index}`
+                      : undefined
+                  }
+                  onClick={event =>
+                    openPopup(
+                      event,
+                      'Errors',
+                      cell.wrongIds,
+                      0,
+                      theme.waBadge,
+                      theme.waBadgeText,
+                    )
+                  }
+                >
+                  {cell.attempts}
+                </td>
+              );
+            })}
+          </tr>
+
+          <tr>
+            <td
+              style={{
+                textAlign: 'left',
+                padding: '6px 14px',
+                fontSize: 11,
+                color: theme.muted,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Failure %
+            </td>
+
+            {model.rows.map(cell => {
+              const color =
+                cell.failurePercent === null
+                  ? theme.tableCellText
+                  : cell.failurePercent < 40
+                    ? '#27ae60'
+                    : cell.failurePercent < 70
+                      ? '#e67e22'
+                      : '#e74c3c';
+
+              return (
+                <td
+                  key={cell.index}
+                  style={{
+                    textAlign: 'center',
+                    padding: '6px 14px',
+                    fontSize: 13,
+                    color,
+                    borderTop: `1px solid ${theme.borderLighter}`,
+                  }}
+                >
+                  {cell.failurePercent === null
+                    ? '—'
+                    : `${cell.failurePercent}%`}
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
+
+      {popup && (
+        <SubmissionPopup
+          label={popup.label}
+          ids={popup.ids}
+          contestId={popup.contestId}
+          badgeBg={popup.bg}
+          badgeFg={popup.fg}
+          timingMap={modeData.submissionTimingMap}
+          contestMap={modeData.submissionContestMap}
           theme={theme}
-          onChange={updateSettings}
+          crossContest
+          crossContestSort={popupSort}
+          anchor={popup.anchor}
+          onCrossContestSortChange={onPopupSortChange}
+          onClose={() => setPopup(null)}
         />
-
-        <div id="cfpm-timeline-extra" />
-
-        <div
-          className="cfpm-info"
-          style={{ color: theme.muted }}
-        >
-          {infoText}
-        </div>
-
-        {settings.tableVisible && (
-          <div className="cfpm-table-scroll">
-            <PerformanceTable
-              modeData={modeData}
-              category={settings.category}
-              deltaInfo={deltaInfo ?? null}
-              theme={theme}
-              popupSort={popupSort}
-              onPopupSortChange={setPopupSort}
-            />
-          </div>
-        )}
-
-        <FrictionPanel
-          modeData={modeData}
-          category={settings.category}
-          settings={settings}
-          theme={theme}
-          onSettingsChange={updateSettings}
-          popupSort={popupSort}
-          onPopupSortChange={setPopupSort}
-        />
-      </div>
-
-      {onlineFriendsHost &&
-        createPortal(
-          <OnlineFriendsPanel
-            theme={theme}
-            visible={settings.friendsVisible}
-          />,
-          onlineFriendsHost,
-        )}
+      )}
     </>
   );
 }
