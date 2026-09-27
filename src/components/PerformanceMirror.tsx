@@ -9,6 +9,7 @@ import { usePerformanceData } from '../hooks/usePerformanceData';
 import { PerformanceTable } from './PerformanceTable';
 import { Controls } from './controls/Controls';
 import { FrictionPanel } from './friction/FrictionPanel';
+import { OnlineFriendsPanel } from './friends/OnlineFriendsPanel';
 
 interface Props {
   engine: PerformanceEngine;
@@ -146,6 +147,8 @@ export function PerformanceMirror({
           popupSort={popupSort}
           onPopupSortChange={setPopupSort}
         />
+
+        <OnlineFriendsPanel theme={theme} visible={settings.friendsVisible} />
       </div>
     </>
   );
