@@ -92,11 +92,14 @@ export async function fetchUserDataset(
 }
 
 /*
- * Codeforces' user.friends API method is
- * authorization-protected.
+ * Codeforces' user.friends?onlyOnline=true
+ * requires API authorization.
  *
- * Instead of putting an API secret into the
- * extension, use the authenticated /friends page.
+ * We intentionally avoid putting an API secret
+ * inside the extension.
+ *
+ * Instead, read the authenticated /friends page
+ * using the user's existing Codeforces session.
  */
 export async function fetchOnlineFriends(): Promise<
   string[]
@@ -126,12 +129,15 @@ export async function fetchOnlineFriends(): Promise<
     );
 
   /*
-   * Find the table containing the friends'
-   * profile links.
+   * Pick the table with the largest number
+   * of profile links. That is the main friends
+   * table on the Codeforces friends page.
    */
   const tables =
     Array.from(
-      doc.querySelectorAll('table'),
+      doc.querySelectorAll(
+        'table',
+      ),
     )
       .map(table => ({
         table,
@@ -145,7 +151,8 @@ export async function fetchOnlineFriends(): Promise<
       )
       .sort(
         (a, b) =>
-          b.count - a.count,
+          b.count -
+          a.count,
       );
 
   const friendsTable =
@@ -153,7 +160,7 @@ export async function fetchOnlineFriends(): Promise<
 
   if (!friendsTable) {
     throw new Error(
-      "Couldn't load your friends. Make sure you're logged in to Codeforces.",
+      "Couldn't find your Codeforces friends table. Make sure you're logged in.",
     );
   }
 
@@ -193,6 +200,41 @@ export async function fetchOnlineFriends(): Promise<
   return handles;
 }
 
+type ExtensionRuntime = {
+  sendMessage: (
+    message: unknown,
+  ) => Promise<unknown>;
+};
+
+function getExtensionRuntime():
+  ExtensionRuntime {
+  const chromeObject =
+    (
+      globalThis as typeof globalThis & {
+        chrome?: {
+          runtime?: ExtensionRuntime;
+        };
+      }
+    ).chrome;
+
+  if (
+    !chromeObject?.runtime
+      ?.sendMessage
+  ) {
+    throw new Error(
+      'CF Performance Mirror background service is unavailable.',
+    );
+  }
+
+  return chromeObject.runtime;
+}
+
+interface UserInfoResponse {
+  ok: boolean;
+  data?: CodeforcesUser[];
+  error?: string;
+}
+
 const USER_INFO_CHUNK_SIZE =
   100;
 
@@ -205,6 +247,9 @@ export async function fetchUsersInfo(
     return [];
   }
 
+  const runtime =
+    getExtensionRuntime();
+
   const chunks: string[][] =
     [];
 
@@ -216,7 +261,8 @@ export async function fetchUsersInfo(
     chunks.push(
       handles.slice(
         i,
-        i + USER_INFO_CHUNK_SIZE,
+        i +
+          USER_INFO_CHUNK_SIZE,
       ),
     );
   }
@@ -225,19 +271,24 @@ export async function fetchUsersInfo(
     await Promise.all(
       chunks.map(
         async chunk => {
-          const data =
-            await get<CodeforcesUser[]>(
-              `/user.info?handles=${chunk
-                .map(
-                  encodeURIComponent,
-                )
-                .join(';')}`,
-            );
+          const response =
+            (await runtime.sendMessage(
+              {
+                type:
+                  'CFPM_FETCH_USER_INFO',
+                handles:
+                  chunk,
+              },
+            )) as UserInfoResponse;
 
-          return data.status ===
-            'OK'
-            ? (data.result ?? [])
-            : [];
+          if (!response?.ok) {
+            throw new Error(
+              response?.error ||
+                'Could not fetch Codeforces user information.',
+            );
+          }
+
+          return response.data ?? [];
         },
       ),
     );

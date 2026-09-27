@@ -21,8 +21,11 @@ const REFRESH_INTERVAL_MS =
   60_000;
 
 /*
- * Consider a friend online when Codeforces has
- * seen them online within the last 5 minutes.
+ * Codeforces exposes lastOnlineTimeSeconds
+ * through user.info.
+ *
+ * Treat a user seen within the last 5 minutes
+ * as online.
  */
 const ONLINE_THRESHOLD_SECONDS =
   5 * 60;
@@ -72,7 +75,8 @@ export function useOnlineFriends(
       return;
     }
 
-    let cancelled = false;
+    let cancelled =
+      false;
 
     const current =
       stateRef.current;
@@ -92,15 +96,15 @@ export function useOnlineFriends(
     (async () => {
       try {
         /*
-         * Get all handles from the authenticated
-         * Codeforces /friends page.
+         * This returns all friends from the
+         * authenticated /friends page.
          */
         const handles =
           await fetchOnlineFriends();
 
         /*
-         * Get fresh public information for those
-         * handles, including lastOnlineTimeSeconds.
+         * This now executes user.info from
+         * the extension service worker.
          */
         const infos =
           handles.length > 0
@@ -115,12 +119,13 @@ export function useOnlineFriends(
           );
 
         /*
-         * Keep only users whose last online time
-         * is within the configured threshold.
+         * Match Codeforces' commonly used
+         * "online now" interpretation:
+         * last seen within 5 minutes.
          *
-         * We intentionally do not require diff >= 0,
-         * because the client/server clocks can differ
-         * slightly.
+         * Do not require diff >= 0 because
+         * the client clock and server clock may
+         * differ slightly.
          */
         const onlineInfos =
           infos.filter(
@@ -172,10 +177,6 @@ export function useOnlineFriends(
           return;
         }
 
-        /*
-         * Keep the previous successful list
-         * during a refresh failure.
-         */
         setState(
           previous =>
             previous.status ===
@@ -207,7 +208,8 @@ export function useOnlineFriends(
       window.setInterval(
         () => {
           setTick(
-            count => count + 1,
+            count =>
+              count + 1,
           );
         },
         REFRESH_INTERVAL_MS,
@@ -224,7 +226,8 @@ export function useOnlineFriends(
     state,
     refresh: () =>
       setTick(
-        count => count + 1,
+        count =>
+          count + 1,
       ),
   };
 }
