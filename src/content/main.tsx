@@ -1,29 +1,78 @@
 import { createRoot } from 'react-dom/client';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import { PerformanceMirror } from '../components/PerformanceMirror';
 import { useTheme } from '../hooks/useTheme';
 import { normalizeSettings } from '../domain/settings';
 import { PerformanceEngine } from '../domain/performanceEngine';
-import { fetchContests, fetchUserDataset } from '../services/codeforcesApi';
-import { loadSettings, loadToggle, saveSettings, saveToggle } from '../services/storage';
-import { mountExtension, observeWidth } from './mount';
-import type { CodeforcesContest } from '../types/codeforces';
-import type { ExtensionSettings } from '../types/settings';
+
+import {
+  fetchContests,
+  fetchUserDataset,
+} from '../services/codeforcesApi';
+
+import {
+  loadSettings,
+  loadToggle,
+  saveSettings,
+  saveToggle,
+} from '../services/storage';
+
+import {
+  mountExtension,
+  observeWidth,
+} from './mount';
+
+import type {
+  CodeforcesContest,
+} from '../types/codeforces';
+
+import type {
+  ExtensionSettings,
+} from '../types/settings';
+
 import css from '../styles/performance-mirror.css?inline';
 
-const HANDLE_RE = /^[a-zA-Z0-9_\-.]{2,24}$/;
+const HANDLE_RE =
+  /^[a-zA-Z0-9_\-.]{2,24}$/;
 
 type LoadState =
-  | { status: 'loading' }
-  | { status: 'ready'; engine: PerformanceEngine }
-  | { status: 'error'; message: string };
+  | {
+      status: 'loading';
+    }
+  | {
+      status: 'ready';
+      engine: PerformanceEngine;
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
 
 interface AppProps {
-  initialSettings: ExtensionSettings;
-  initialEnabled: boolean;
-  onlineFriendsHost: HTMLElement | null;
-  onSettingsChange: (settings: ExtensionSettings) => void;
-  onEnabledChange: (enabled: boolean) => void;
+  initialSettings:
+    ExtensionSettings;
+
+  initialEnabled:
+    boolean;
+
+  onlineFriendsHost:
+    HTMLElement | null;
+
+  onSettingsChange:
+    (
+      settings: ExtensionSettings,
+    ) => void;
+
+  onEnabledChange:
+    (
+      enabled: boolean,
+    ) => void;
+
   loadState: LoadState;
 }
 
@@ -35,10 +84,15 @@ function App({
   onEnabledChange,
   loadState,
 }: AppProps) {
-  const theme = useTheme();
+  const theme =
+    useTheme();
 
   useEffect(() => {
-    const host = document.getElementById('cfpm-compact');
+    const host =
+      document.getElementById(
+        'cfpm-compact',
+      );
+
     if (!host) return;
 
     host.style.cssText = [
@@ -54,42 +108,152 @@ function App({
       'max-width:920px',
     ].join(';');
 
-    host.style.setProperty('--cfpm-bg', theme.bg);
-    host.style.setProperty('--cfpm-text', theme.text);
-    host.style.setProperty('--cfpm-border', theme.border);
-    host.style.setProperty('--cfpm-border-light', theme.borderLight);
-    host.style.setProperty('--cfpm-border-lighter', theme.borderLighter);
-    host.style.setProperty('--cfpm-muted', theme.muted);
-    host.style.setProperty('--cfpm-muted-strong', theme.mutedStrong);
-    host.style.setProperty('--cfpm-heading', theme.headingText);
-    host.style.setProperty('--cfpm-table-header', theme.tableHeaderText);
-    host.style.setProperty('--cfpm-table-cell', theme.tableCellText);
-    host.style.setProperty('--cfpm-btn-bg', theme.btnBg);
-    host.style.setProperty('--cfpm-btn-text', theme.btnText);
-    host.style.setProperty('--cfpm-btn-border', theme.btnBorder);
-    host.style.setProperty('--cfpm-active-bg', theme.btnActiveBg);
-    host.style.setProperty('--cfpm-active-text', theme.btnActiveText);
-    host.style.setProperty('--cfpm-active-border', theme.btnActiveBorder);
-    host.style.setProperty('--cfpm-empty', theme.emptyText);
-    host.style.setProperty('--cfpm-input-bg', theme.inputBg);
-    host.style.setProperty('--cfpm-input-text', theme.inputText);
-    host.style.setProperty('--cfpm-input-border', theme.inputBorder);
-    host.style.setProperty('--cfpm-dropdown-bg', theme.dropdownBg);
-    host.style.setProperty('--cfpm-dropdown-border', theme.dropdownBorder);
-    host.style.setProperty('--cfpm-dropdown-section', theme.dropdownSection);
-    host.style.setProperty('--cfpm-accent', theme.accentBlue);
+    host.style.setProperty(
+      '--cfpm-bg',
+      theme.bg,
+    );
+
+    host.style.setProperty(
+      '--cfpm-text',
+      theme.text,
+    );
+
+    host.style.setProperty(
+      '--cfpm-border',
+      theme.border,
+    );
+
+    host.style.setProperty(
+      '--cfpm-border-light',
+      theme.borderLight,
+    );
+
+    host.style.setProperty(
+      '--cfpm-border-lighter',
+      theme.borderLighter,
+    );
+
+    host.style.setProperty(
+      '--cfpm-muted',
+      theme.muted,
+    );
+
+    host.style.setProperty(
+      '--cfpm-muted-strong',
+      theme.mutedStrong,
+    );
+
+    host.style.setProperty(
+      '--cfpm-heading',
+      theme.headingText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-table-header',
+      theme.tableHeaderText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-table-cell',
+      theme.tableCellText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-btn-bg',
+      theme.btnBg,
+    );
+
+    host.style.setProperty(
+      '--cfpm-btn-text',
+      theme.btnText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-btn-border',
+      theme.btnBorder,
+    );
+
+    host.style.setProperty(
+      '--cfpm-active-bg',
+      theme.btnActiveBg,
+    );
+
+    host.style.setProperty(
+      '--cfpm-active-text',
+      theme.btnActiveText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-active-border',
+      theme.btnActiveBorder,
+    );
+
+    host.style.setProperty(
+      '--cfpm-empty',
+      theme.emptyText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-input-bg',
+      theme.inputBg,
+    );
+
+    host.style.setProperty(
+      '--cfpm-input-text',
+      theme.inputText,
+    );
+
+    host.style.setProperty(
+      '--cfpm-input-border',
+      theme.inputBorder,
+    );
+
+    host.style.setProperty(
+      '--cfpm-dropdown-bg',
+      theme.dropdownBg,
+    );
+
+    host.style.setProperty(
+      '--cfpm-dropdown-border',
+      theme.dropdownBorder,
+    );
+
+    host.style.setProperty(
+      '--cfpm-dropdown-section',
+      theme.dropdownSection,
+    );
+
+    host.style.setProperty(
+      '--cfpm-accent',
+      theme.accentBlue,
+    );
   }, [theme]);
 
-  if (loadState.status === 'ready') {
+  if (
+    loadState.status ===
+    'ready'
+  ) {
     return (
       <PerformanceMirror
-        engine={loadState.engine}
-        initialSettings={initialSettings}
-        initialEnabled={initialEnabled}
-        onlineFriendsHost={onlineFriendsHost}
+        engine={
+          loadState.engine
+        }
+        initialSettings={
+          initialSettings
+        }
+        initialEnabled={
+          initialEnabled
+        }
+        onlineFriendsHost={
+          onlineFriendsHost
+        }
         theme={theme}
-        onSettingsChange={onSettingsChange}
-        onEnabledChange={onEnabledChange}
+        onSettingsChange={
+          onSettingsChange
+        }
+        onEnabledChange={
+          onEnabledChange
+        }
       />
     );
   }
@@ -100,22 +264,30 @@ function App({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '5px 12px',
+          justifyContent:
+            'space-between',
+          padding:
+            '5px 12px',
           gap: 10,
           minHeight: 32,
-          boxSizing: 'border-box',
+          boxSizing:
+            'border-box',
         }}
       >
         <span
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: theme.muted,
-            letterSpacing: '0.1em',
-            cursor: 'default',
-            userSelect: 'none',
-            fontFamily: 'monospace',
+            color:
+              theme.muted,
+            letterSpacing:
+              '0.1em',
+            cursor:
+              'default',
+            userSelect:
+              'none',
+            fontFamily:
+              'monospace',
             opacity: 0.8,
           }}
         >
@@ -125,20 +297,33 @@ function App({
 
       <div
         id="cfpm-header-divider"
-        style={{ height: 1, background: theme.borderLight }}
+        style={{
+          height: 1,
+          background:
+            theme.borderLight,
+        }}
       />
 
       <div id="cfpm-body">
-        <div style={{ padding: '0 14px 14px', boxSizing: 'border-box' }}>
+        <div
+          style={{
+            padding:
+              '0 14px 14px',
+            boxSizing:
+              'border-box',
+          }}
+        >
           <div
             style={{
-              color: theme.muted,
+              color:
+                theme.muted,
               fontSize: 12,
               marginTop: 2,
               marginBottom: 10,
             }}
           >
-            {loadState.status === 'loading'
+            {loadState.status ===
+            'loading'
               ? 'Loading…'
               : loadState.message}
           </div>
@@ -150,46 +335,94 @@ function App({
 
 function createEngine(
   contests: CodeforcesContest[],
-  submissions: Awaited<ReturnType<typeof fetchUserDataset>>['submissions'],
-  ratingHistory: Awaited<ReturnType<typeof fetchUserDataset>>['ratingHistory'],
+  submissions: Awaited<
+    ReturnType<
+      typeof fetchUserDataset
+    >
+  >['submissions'],
+  ratingHistory: Awaited<
+    ReturnType<
+      typeof fetchUserDataset
+    >
+  >['ratingHistory'],
 ): PerformanceEngine {
-  const contestMap = Object.fromEntries(
-    contests.map(contest => [contest.id, contest]),
-  ) as Record<number, CodeforcesContest>;
+  const contestMap =
+    Object.fromEntries(
+      contests.map(
+        contest => [
+          contest.id,
+          contest,
+        ],
+      ),
+    ) as Record<
+      number,
+      CodeforcesContest
+    >;
 
-  const ratedContestSet = new Set(
-    ratingHistory.map(change => change.contestId),
-  );
+  const ratedContestSet =
+    new Set<number>(
+      ratingHistory.map(
+        change =>
+          change.contestId,
+      ),
+    );
 
   return new PerformanceEngine({
     contestMap,
-    rawSubmissions: submissions,
+    rawSubmissions:
+      submissions,
     ratedContestSet,
-    userRatingHistory: ratingHistory,
+    userRatingHistory:
+      ratingHistory,
   });
 }
 
 function Root({
   onlineFriendsHost,
 }: {
-  onlineFriendsHost: HTMLElement | null;
+  onlineFriendsHost:
+    HTMLElement | null;
 }) {
-  const settings = useMemo(() => normalizeSettings(loadSettings()), []);
-  const initialEnabled = useMemo(() => loadToggle(), []);
-  const [loadState, setLoadState] = useState<LoadState>({
-    status: 'loading',
-  });
+  const settings =
+    useMemo(
+      () =>
+        normalizeSettings(
+          loadSettings(),
+        ),
+      [],
+    );
+
+  const initialEnabled =
+    useMemo(
+      () => loadToggle(),
+      [],
+    );
+
+  const [loadState, setLoadState] =
+    useState<LoadState>({
+      status: 'loading',
+    });
 
   useEffect(() => {
-    let cancelled = false;
-    const handle = (window.location.pathname.split('/')[2] || '').trim();
+    let cancelled =
+      false;
 
-    if (!HANDLE_RE.test(handle)) {
+    const handle =
+      (
+        window.location.pathname
+          .split('/')[2] ||
+        ''
+      ).trim();
+
+    if (
+      !HANDLE_RE.test(handle)
+    ) {
       setLoadState({
         status: 'error',
         message:
           'Could not detect a valid Codeforces username in the page URL.',
       });
+
       return () => {
         cancelled = true;
       };
@@ -197,35 +430,51 @@ function Root({
 
     (async () => {
       try {
-        const [contests, dataset] = await Promise.all([
-          fetchContests(),
-          fetchUserDataset(handle),
-        ]);
+        const [
+          contests,
+          dataset,
+        ] =
+          await Promise.all([
+            fetchContests(),
+            fetchUserDataset(
+              handle,
+            ),
+          ]);
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         setLoadState({
           status: 'ready',
-          engine: createEngine(
-            contests,
-            dataset.submissions,
-            dataset.ratingHistory,
-          ),
+          engine:
+            createEngine(
+              contests,
+              dataset.submissions,
+              dataset.ratingHistory,
+            ),
         });
       } catch (error) {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         const message =
-          error instanceof Error && error.message
+          error instanceof
+            Error &&
+          error.message
             ? error.message
             : 'Could not connect to Codeforces. Please check your connection and try again.';
 
         setLoadState({
           status: 'error',
           message:
-            message === 'unknown'
+            message ===
+            'unknown'
               ? 'Codeforces returned an error: unknown'
-              : message.startsWith('Codeforces returned')
+              : message.startsWith(
+                  'Codeforces returned',
+                )
                 ? message
                 : 'Could not connect to Codeforces. Please check your connection and try again.',
         });
@@ -237,48 +486,103 @@ function Root({
     };
   }, []);
 
-  const saveCurrentSettings = (next: ExtensionSettings): void =>
-    saveSettings(next);
+  const saveCurrentSettings =
+    (
+      next: ExtensionSettings,
+    ): void =>
+      saveSettings(next);
 
   return (
     <App
-      initialSettings={settings}
-      initialEnabled={initialEnabled}
-      onlineFriendsHost={onlineFriendsHost}
-      onSettingsChange={saveCurrentSettings}
-      onEnabledChange={saveToggle}
-      loadState={loadState}
+      initialSettings={
+        settings
+      }
+      initialEnabled={
+        initialEnabled
+      }
+      onlineFriendsHost={
+        onlineFriendsHost
+      }
+      onSettingsChange={
+        saveCurrentSettings
+      }
+      onEnabledChange={
+        saveToggle
+      }
+      loadState={
+        loadState
+      }
     />
   );
 }
 
 function installApp(): void {
-  if (document.getElementById('cfpm-compact')) return;
+  if (
+    document.getElementById(
+      'cfpm-compact',
+    )
+  ) {
+    return;
+  }
 
-  const handle = (window.location.pathname.split('/')[2] || '').trim();
-  if (!HANDLE_RE.test(handle)) return;
+  const handle =
+    (
+      window.location.pathname
+        .split('/')[2] ||
+      ''
+    ).trim();
+
+  if (
+    !HANDLE_RE.test(handle)
+  ) {
+    return;
+  }
 
   const {
     host,
     appRoot,
     onlineFriendsHost,
     widthSource,
-  } = mountExtension();
+  } =
+    mountExtension();
 
-  observeWidth(host, widthSource);
+  observeWidth(
+    host,
+    widthSource,
+  );
 
-  const styleId = 'cfpm-toggle-style';
-  const oldStyle = document.getElementById(styleId);
+  const styleId =
+    'cfpm-toggle-style';
+
+  const oldStyle =
+    document.getElementById(
+      styleId,
+    );
 
   if (!oldStyle) {
-    const style = document.createElement('style');
-    style.id = styleId;
+    const style =
+      document.createElement(
+        'style',
+      );
+
+    style.id =
+      styleId;
+
     style.textContent = css;
-    document.head.appendChild(style);
+
+    document.head.appendChild(
+      style,
+    );
   }
 
-  createRoot(appRoot).render(
-    <Root onlineFriendsHost={onlineFriendsHost} />,
+  createRoot(
+    appRoot,
+  ).render(
+    <Root
+      onlineFriendsHost={
+        onlineFriendsHost
+      }
+    />,
   );
 }
 
