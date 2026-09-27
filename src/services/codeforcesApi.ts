@@ -8,8 +8,11 @@ import type {
 
 const API_BASE = 'https://codeforces.com/api';
 
-async function get<T>(path: string): Promise<CodeforcesApiResponse<T>> {
-  const response = await fetch(`${API_BASE}${path}`);
+async function get<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<CodeforcesApiResponse<T>> {
+  const response = await fetch(`${API_BASE}${path}`, init);
   return response.json() as Promise<CodeforcesApiResponse<T>>;
 }
 
