@@ -1,85 +1,179 @@
-import type {
-  CodeforcesApiResponse,
-  CodeforcesContest,
-  CodeforcesRatingChange,
-  CodeforcesSubmission,
-  CodeforcesUser,
-} from '../types/codeforces';
-
-const API_BASE = 'https://codeforces.com/api';
-
-async function get<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<CodeforcesApiResponse<T>> {
-  const response = await fetch(`${API_BASE}${path}`, init);
-  return response.json() as Promise<CodeforcesApiResponse<T>>;
+export interface MountResult {
+  host: HTMLElement;
+  root: Document;
+  appRoot: HTMLDivElement;
+  onlineFriendsHost: HTMLElement | null;
+  widthSource: Element | null;
 }
 
-export async function fetchContests(): Promise<CodeforcesContest[]> {
-  const data = await get<CodeforcesContest[]>('/contest.list');
-  return data.status === 'OK' ? (data.result ?? []) : [];
-}
+function findProblemRatingsBox(): Element | null {
+  const boxes = document.querySelectorAll('.box');
 
-export async function fetchUserRating(handle: string): Promise<CodeforcesRatingChange[]> {
-  const data = await get<CodeforcesRatingChange[]>(`/user.rating?handle=${encodeURIComponent(handle)}`);
-  return data.status === 'OK' ? (data.result ?? []) : [];
-}
+  for (const box of boxes) {
+    const headings = box.querySelectorAll('h2, h3, .title, [class*="title"], [class*="header"]');
 
-export async function fetchUserSubmissions(handle: string): Promise<CodeforcesSubmission[]> {
-  const data = await get<CodeforcesSubmission[]>(`/user.status?handle=${encodeURIComponent(handle)}&count=10000`);
-  if (data.status !== 'OK') {
-    throw new Error(data.comment || 'unknown');
+    for (const heading of headings) {
+      if (heading.textContent?.trim().toLowerCase().includes('problem ratings')) {
+        return box;
+      }
+    }
+
+    const firstText = box.firstElementChild;
+    if (firstText?.textContent?.trim().toLowerCase().includes('problem ratings')) {
+      return box;
+    }
   }
-  return data.result ?? [];
+
+  return null;
 }
 
-export async function fetchUserDataset(handle: string): Promise<{
-  submissions: CodeforcesSubmission[];
-  ratingHistory: CodeforcesRatingChange[];
-}> {
-  const [submissions, ratingHistory] = await Promise.all([
-    fetchUserSubmissions(handle),
-    fetchUserRating(handle),
-  ]);
-  return { submissions, ratingHistory };
+function findTopContributorsBox(sidebar: Element): Element | null {
+  const boxes = sidebar.querySelectorAll('.roundbox');
+
+  for (const box of boxes) {
+    const text = box.textContent?.trim().toLowerCase() ?? '';
+    if (text.includes('top contributors')) {
+      return box;
+    }
+  }
+
+  return null;
 }
 
-// user.friends is an "authorized" CF API method. It relies on the
-// authenticated Codeforces browser session.
-export async function fetchOnlineFriends(): Promise<string[]> {
-  const data = await get<string[]>('/user.friends?onlyOnline=true', {
-    credentials: 'include',
+function mountOnlineFriendsHost(): HTMLElement | null {
+  const existing = document.getElementById('cfpm-online-friends');
+  if (existing) return existing;
+
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return null;
+
+  const host = document.createElement('div');
+  host.id = 'cfpm-online-friends';
+  host.style.width = '100%';
+  host.style.boxSizing = 'border-box';
+
+  const topContributors = findTopContributorsBox(sidebar);
+
+  if (topContributors) {
+    topContributors.insertAdjacentElement('afterend', host);
+  } else {
+    sidebar.appendChild(host);
+  }
+
+  return host;
+}
+
+export function mountExtension(): MountResult {
+  const existing = document.getElementById('cfpm-compact');
+
+  if (existing) {
+    const appRoot =
+      existing.querySelector<HTMLDivElement>('#cfpm-react-root') ||
+      existing as HTMLDivElement;
+
+    return {
+      host: existing,
+      root: document,
+      appRoot,
+      onlineFriendsHost: document.getElementById('cfpm-online-friends'),
+      widthSource: null,
+    };
+  }
+
+  const host = document.createElement('div');
+  host.id = 'cfpm-compact';
+
+  const visible = Array.from(document.querySelectorAll('.box')).filter(element => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 220 && rect.height > 50;
   });
 
-  if (data.status !== 'OK') {
-    throw new Error(data.comment || 'unknown');
+  let widthSource: Element | null = null;
+
+  if (visible.length > 0) {
+    widthSource = visible[visible.length - 1];
+    host.style.width = `${Math.round(widthSource.getBoundingClientRect().width)}px`;
+    widthSource.insertAdjacentElement('afterend', host);
+  } else {
+    const main = document.querySelector('#pageContent, #mainContent, .mainContent, .content');
+
+    if (main) {
+      widthSource = main;
+      host.style.width = `${Math.round(main.getBoundingClientRect().width)}px`;
+      main.appendChild(host);
+    } else {
+      document.body.appendChild(host);
+      host.style.width = '880px';
+    }
   }
 
-  return data.result ?? [];
+  const appRoot = document.createElement('div');
+  appRoot.id = 'cfpm-react-root';
+  host.appendChild(appRoot);
+
+  const existingRatingsBox = findProblemRatingsBox();
+
+  if (existingRatingsBox && existingRatingsBox !== host) {
+    existingRatingsBox.insertAdjacentElement('afterend', host);
+
+    return {
+      host,
+      root: document,
+      appRoot,
+      onlineFriendsHost: mountOnlineFriendsHost(),
+      widthSource,
+    };
+  }
+
+  let relocated = false;
+
+  const relocateObserver = new MutationObserver(() => {
+    if (relocated) return;
+
+    const ratingsBox = findProblemRatingsBox();
+    if (!ratingsBox || ratingsBox === host) return;
+
+    relocated = true;
+    relocateObserver.disconnect();
+
+    setTimeout(() => {
+      ratingsBox.insertAdjacentElement('afterend', host);
+    }, 50);
+  });
+
+  relocateObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  setTimeout(() => {
+    if (!relocated) relocateObserver.disconnect();
+  }, 10000);
+
+  return {
+    host,
+    root: document,
+    appRoot,
+    onlineFriendsHost: mountOnlineFriendsHost(),
+    widthSource,
+  };
 }
 
-const USER_INFO_CHUNK_SIZE = 100;
+export function observeWidth(
+  host: HTMLElement,
+  source: Element | null,
+): ResizeObserver | null {
+  if (!source || !window.ResizeObserver) return null;
 
-// Chunked so a large friends list can't build one oversized request URL.
-// A single failed chunk degrades to an empty list for those handles instead
-// of failing the whole lookup.
-export async function fetchUsersInfo(handles: string[]): Promise<CodeforcesUser[]> {
-  if (handles.length === 0) return [];
+  const observer = new ResizeObserver(entries => {
+    for (const entry of entries) {
+      const width = Math.round(entry.contentRect.width);
+      if (width > 220) {
+        host.style.width = `${width}px`;
+      }
+    }
+  });
 
-  const chunks: string[][] = [];
-  for (let i = 0; i < handles.length; i += USER_INFO_CHUNK_SIZE) {
-    chunks.push(handles.slice(i, i + USER_INFO_CHUNK_SIZE));
-  }
-
-  const results = await Promise.all(
-    chunks.map(async chunk => {
-      const data = await get<CodeforcesUser[]>(
-        `/user.info?handles=${chunk.map(encodeURIComponent).join(';')}`,
-      );
-      return data.status === 'OK' ? (data.result ?? []) : [];
-    }),
-  );
-
-  return results.flat();
+  observer.observe(source);
+  return observer;
 }
