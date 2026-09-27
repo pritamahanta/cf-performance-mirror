@@ -2,6 +2,7 @@ export interface MountResult {
   host: HTMLElement;
   root: Document;
   appRoot: HTMLDivElement;
+  onlineFriendsHost: HTMLElement | null;
   widthSource: Element | null;
 }
 
@@ -18,12 +19,51 @@ function findProblemRatingsBox(): Element | null {
   return null;
 }
 
+function mountOnlineFriendsHost(): HTMLElement | null {
+  const existing = document.getElementById('cfpm-online-friends');
+  if (existing) return existing;
+
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return null;
+
+  const host = document.createElement('div');
+
+  host.id = 'cfpm-online-friends';
+  host.style.width = '100%';
+  host.style.boxSizing = 'border-box';
+
+  const sidebarBoxes = Array.from(
+    sidebar.querySelectorAll('.roundbox.sidebox'),
+  );
+
+  const topContributors = sidebarBoxes.find(box =>
+    box.textContent?.trim().toLowerCase().includes('top contributors'),
+  );
+
+  if (topContributors) {
+    topContributors.insertAdjacentElement('afterend', host);
+  } else {
+    sidebar.appendChild(host);
+  }
+
+  return host;
+}
+
 export function mountExtension(): MountResult {
   const existing = document.getElementById('cfpm-compact');
   if (existing) {
-    const appRoot = existing.querySelector<HTMLDivElement>('#cfpm-react-root') || existing as HTMLDivElement;
-    return { host: existing, root: document, appRoot, widthSource: null };
-  }
+  const appRoot =
+    existing.querySelector<HTMLDivElement>('#cfpm-react-root') ||
+    existing as HTMLDivElement;
+
+  return {
+    host: existing,
+    root: document,
+    appRoot,
+    onlineFriendsHost: document.getElementById('cfpm-online-friends'),
+    widthSource: null,
+  };
+}
 
   const host = document.createElement('div');
   host.id = 'cfpm-compact';
