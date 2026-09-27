@@ -623,7 +623,7 @@ function ProblemRow({
   return (
     <div style={rowStyle} onClick={openProblem}>
       {/* Problem link */}
-      
+      <a
         href={`https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`}
         target="_blank"
         rel="noopener"
@@ -655,7 +655,7 @@ function ProblemRow({
 
       {/* Contest link */}
       {problem.contestName ? (
-        
+        <a
           href={`https://codeforces.com/contest/${problem.contestId}`}
           target="_blank"
           rel="noopener"
