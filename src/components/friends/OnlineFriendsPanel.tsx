@@ -1,13 +1,10 @@
 import type {
-  CSSProperties,
-} from 'react';
-
-import type {
   Theme,
 } from '../../domain/theme';
 
 import {
-  getRatingColor,
+  getRatedUserClassName,
+  isLegendaryRank,
 } from '../../domain/utils';
 
 import {
@@ -22,16 +19,6 @@ interface Props {
   theme: Theme;
   visible: boolean;
 }
-
-const ONLINE_DOT:
-  CSSProperties = {
-  width: 7,
-  height: 7,
-  borderRadius: '50%',
-  background:
-    '#2ecc71',
-  flexShrink: 0,
-};
 
 function timeAgoLabel(
   updatedAt: number,
@@ -63,6 +50,71 @@ function timeAgoLabel(
   )}m ago`;
 }
 
+/*
+ * Renders the friend's handle the same way
+ * Codeforces itself does: colored by rating tier,
+ * with the two-tone first letter Codeforces uses
+ * for Legendary Grandmasters.
+ */
+function RatedHandle({
+  handle,
+  rank,
+}: {
+  handle: string;
+  rank?: string;
+}) {
+  const className =
+    getRatedUserClassName(
+      rank,
+    );
+
+  if (
+    isLegendaryRank(
+      rank,
+    )
+  ) {
+    return (
+      <a
+        href={buildProfileUrl(
+          handle,
+        )}
+        target="_blank"
+        rel="noopener"
+        title={handle}
+        className={
+          className
+        }
+      >
+        <span className="legendary-user-first-letter">
+          {handle.charAt(
+            0,
+          )}
+        </span>
+        {handle.slice(
+          1,
+        )}
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={buildProfileUrl(
+        handle,
+      )}
+      target="_blank"
+      rel="noopener"
+      title={handle}
+      className={
+        className ||
+        undefined
+      }
+    >
+      {handle}
+    </a>
+  );
+}
+
 export function OnlineFriendsPanel({
   theme,
   visible,
@@ -79,318 +131,219 @@ export function OnlineFriendsPanel({
     return null;
   }
 
-  const count =
-    state.status ===
-    'ready'
-      ? state.friends.length
-      : null;
-
   const refreshTitle =
     state.status ===
     'ready'
       ? `Updated ${timeAgoLabel(
           state.updatedAt,
-        )} · Refresh`
+        )} \u00b7 Refresh`
       : 'Refresh';
 
+  const isRefreshing =
+    state.status ===
+      'loading' ||
+    (state.status ===
+      'ready' &&
+      state.refreshing);
+
+  /*
+   * Structure mirrors Codeforces' own sidebar
+   * boxes exactly (verified live against the
+   * "Top contributors" box on codeforces.com):
+   *
+   * <div class="roundbox sidebox borderTopRound">
+   *   <div class="caption titled">
+   *     -> Title
+   *     <div class="top-links">...</div>
+   *   </div>
+   *   <table class="rtable">...</table>
+   * </div>
+   *
+   * Using those real class names (rather than
+   * custom CSS) means this renders with
+   * Codeforces' own live stylesheet - fonts,
+   * spacing, row shading, dark mode - instead of
+   * an approximation of it.
+   */
   return (
-    <div
-      style={{
-        margin:
-          '10px 0',
-        width:
-          '100%',
-        boxSizing:
-          'border-box',
-      }}
-    >
-      <div
-        style={{
-          border:
-            `1px solid ${theme.borderLight}`,
-          borderRadius: 5,
-          overflow:
-            'hidden',
-          display:
-            'flex',
-          flexDirection:
-            'column',
-        }}
-      >
-        <div
-          style={{
-            display:
-              'flex',
-            alignItems:
-              'center',
-            justifyContent:
-              'space-between',
-            borderBottom:
-              `1px solid ${theme.borderLight}`,
-            minHeight: 38,
-            padding:
-              '0 8px 0 12px',
-            flexShrink:
-              0,
-            gap: 8,
-            background:
-              theme.bg,
-          }}
-        >
-          <div
-            style={{
-              display:
-                'flex',
-              alignItems:
-                'center',
-              gap: 7,
-              minWidth:
-                0,
-            }}
-          >
-            <span
-              style={{
-                ...ONLINE_DOT,
-                boxShadow:
-                  '0 0 0 2px rgba(46,204,113,0.18)',
-              }}
-            />
+    <div className="roundbox sidebox borderTopRound">
+      <div className="caption titled">
+        {'\u2192 Online friends'}
 
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color:
-                  theme.headingText,
-                whiteSpace:
-                  'nowrap',
-              }}
-            >
-              Online Friends
-            </span>
-
-            {count !== null && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  borderRadius: 9,
-                  padding:
-                    '0 5px',
-                  minWidth: 16,
-                  textAlign:
-                    'center',
-                  display:
-                    'inline-block',
-                  background:
-                    theme.isDark
-                      ? '#3a3a3a'
-                      : '#d8d8d8',
-                  color:
-                    theme.muted,
-                }}
-              >
-                {count}
-              </span>
-            )}
-          </div>
-
-          <button
-            className="cfpm-icon-btn"
+        <div className="top-links">
+          <a
+            onClick={
+              refresh
+            }
             title={
               refreshTitle
             }
             aria-label="Refresh online friends"
             style={{
-              width: 24,
-              height: 24,
-              background:
-                theme.btnBg,
-              color:
-                theme.muted,
-              border:
-                `1px solid ${theme.btnBorder}`,
-            }}
-            onClick={
-              refresh
-            }
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
-              <path d="M13.5 2.5v3.2h-3.2" />
-            </svg>
-          </button>
-        </div>
-
-        {state.status ===
-          'loading' && (
-          <div
-            style={{
-              padding:
-                '18px 14px',
-              color:
-                theme.emptyText,
-              fontStyle:
-                'italic',
-              fontSize: 12.5,
-              textAlign:
-                'center',
-            }}
-          >
-            Loading online friends…
-          </div>
-        )}
-
-        {state.status ===
-          'error' && (
-          <div
-            style={{
-              padding:
-                '16px 14px',
-              color:
-                theme.muted,
-              fontSize: 12,
-              textAlign:
-                'center',
-              lineHeight:
-                1.5,
-            }}
-          >
-            {state.message}
-          </div>
-        )}
-
-        {state.status ===
-          'ready' &&
-          state.friends
-            .length === 0 && (
-          <div
-            style={{
-              padding:
-                '18px 14px',
-              color:
-                theme.emptyText,
-              fontStyle:
-                'italic',
-              fontSize: 12.5,
-              textAlign:
-                'center',
-            }}
-          >
-            No friends online right now.
-          </div>
-        )}
-
-        {state.status ===
-          'ready' &&
-          state.friends
-            .length > 0 && (
-          <div
-            className="cfpm-list-scroll"
-            style={{
-              maxHeight:
-                196,
-              overflowY:
-                'auto',
-              width:
-                '100%',
-              boxSizing:
-                'border-box',
+              cursor:
+                'pointer',
               opacity:
-                state.refreshing
-                  ? 0.6
+                isRefreshing
+                  ? 0.5
                   : 1,
-              transition:
-                'opacity 0.15s ease',
             }}
           >
+            {isRefreshing
+              ? 'Refreshing\u2026'
+              : 'Refresh'}
+          </a>
+        </div>
+      </div>
+
+      {state.status ===
+        'loading' && (
+        <div
+          style={{
+            padding:
+              '0.75em 1em',
+            textAlign:
+              'center',
+          }}
+        >
+          Loading online friends\u2026
+        </div>
+      )}
+
+      {state.status ===
+        'error' && (
+        <div
+          style={{
+            padding:
+              '0.75em 1em',
+            textAlign:
+              'center',
+          }}
+        >
+          {state.message}
+        </div>
+      )}
+
+      {state.status ===
+        'ready' &&
+        state.friends
+          .length ===
+          0 && (
+        <div
+          style={{
+            padding:
+              '0.75em 1em',
+            textAlign:
+              'center',
+          }}
+        >
+          No friends online right now.
+        </div>
+      )}
+
+      {state.status ===
+        'ready' &&
+        state.friends
+          .length >
+          0 && (
+        <table className="rtable">
+          <tbody>
+            <tr>
+              <th
+                className="left"
+                style={{
+                  width:
+                    '2.25em',
+                }}
+              >
+                &nbsp;
+              </th>
+              <th>
+                User
+              </th>
+              <th
+                style={{
+                  width:
+                    '5em',
+                }}
+              >
+                Rating
+              </th>
+            </tr>
+
             {state.friends.map(
               (
                 friend,
                 index,
-              ) => (
-                <a
-                  key={
-                    friend.handle
-                  }
-                  className="cfpm-sub-link"
-                  href={buildProfileUrl(
-                    friend.handle,
-                  )}
-                  target="_blank"
-                  rel="noopener"
-                  style={{
-                    color:
-                      theme.text,
-                    borderTop:
-                      index > 0
-                        ? `1px solid ${theme.borderLighter}`
-                        : undefined,
-                  }}
-                >
-                  <span
-                    style={
-                      ONLINE_DOT
-                    }
-                  />
+              ) => {
+                const dark =
+                  index %
+                    2 ===
+                  0;
 
-                  <span
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      overflow:
-                        'hidden',
-                      textOverflow:
-                        'ellipsis',
-                      whiteSpace:
-                        'nowrap',
-                      color:
-                        getRatingColor(
-                          friend.rating,
-                        ),
-                      fontWeight:
-                        700,
-                    }}
-                  >
-                    {
+                return (
+                  <tr
+                    key={
                       friend.handle
                     }
-                  </span>
-
-                  {typeof friend.rating ===
-                    'number' && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color:
-                          theme.muted,
-                        fontWeight:
-                          400,
-                        flexShrink:
-                          0,
-                      }}
-                    >
-                      {
-                        friend.rating
+                  >
+                    <td
+                      className={
+                        dark
+                          ? 'left dark'
+                          : 'left'
                       }
-                    </span>
-                  )}
-                </a>
-              ),
+                      title="Online now"
+                    >
+                      <span
+                        style={{
+                          display:
+                            'inline-block',
+                          width: 7,
+                          height: 7,
+                          borderRadius:
+                            '50%',
+                          background:
+                            '#2ecc71',
+                        }}
+                      />
+                    </td>
+
+                    <td
+                      className={
+                        dark
+                          ? 'dark'
+                          : ''
+                      }
+                    >
+                      <RatedHandle
+                        handle={
+                          friend.handle
+                        }
+                        rank={
+                          friend.rank
+                        }
+                      />
+                    </td>
+
+                    <td
+                      className={
+                        dark
+                          ? 'dark'
+                          : ''
+                      }
+                    >
+                      {typeof friend.rating ===
+                      'number'
+                        ? friend.rating
+                        : '\u2014'}
+                    </td>
+                  </tr>
+                );
+              },
             )}
-          </div>
-        )}
-      </div>
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

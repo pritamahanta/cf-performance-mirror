@@ -19,14 +19,18 @@ import type {
 } from '../domain/friends';
 
 /*
- * Checking online status now means one request
- * per friend (see fetchOnlineHandles), not one
- * batched API call, so refreshing every 2 minutes
- * instead of every 1 keeps request volume more
- * reasonable.
+ * Checking online status means one request per
+ * friend (see fetchOnlineHandles), not one batched
+ * call, so this can't be as tight as a typical
+ * poll without risking heavy, sustained load on
+ * codeforces.com. 60s is a middle ground: noticeably
+ * live, without firing ~1 request/friend every few
+ * seconds indefinitely. The panel's own refresh
+ * button (top-right) still gives an instant manual
+ * check any time.
  */
 const REFRESH_INTERVAL_MS =
-  120_000;
+  60_000;
 
 const LOAD_ERROR_MESSAGE =
   "Couldn't load your online friends. Make sure you're logged in to Codeforces.";
