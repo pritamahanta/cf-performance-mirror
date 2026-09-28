@@ -1,7 +1,3 @@
-import type {
-  Theme,
-} from '../../domain/theme';
-
 import {
   getRatedUserClassName,
   isLegendaryRank,
@@ -16,7 +12,6 @@ import {
 } from '../../hooks/useOnlineFriends';
 
 interface Props {
-  theme: Theme;
   visible: boolean;
 }
 
@@ -115,8 +110,35 @@ function RatedHandle({
   );
 }
 
+/*
+ * Small, unobtrusive brand mark - same monospace,
+ * muted-gray, letter-spaced treatment used for the
+ * "cfpm" label on the main mirror panel. Sits in
+ * the box's own top-links slot next to Refresh, not
+ * meant to draw attention.
+ */
+function CfpmMark() {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing:
+          '0.08em',
+        fontFamily:
+          'monospace',
+        color: '#999999',
+        opacity: 0.75,
+        userSelect: 'none',
+      }}
+      title="CF Performance Mirror"
+    >
+      cfpm
+    </span>
+  );
+}
+
 export function OnlineFriendsPanel({
-  theme,
   visible,
 }: Props) {
   const {
@@ -168,9 +190,19 @@ export function OnlineFriendsPanel({
   return (
     <div className="roundbox sidebox borderTopRound">
       <div className="caption titled">
-        {'\u2192 Online friends'}
+        {'\u2192 Online Friends'}
 
-        <div className="top-links">
+        <div
+          className="top-links"
+          style={{
+            display: 'flex',
+            alignItems:
+              'center',
+            gap: 8,
+          }}
+        >
+          <CfpmMark />
+
           <a
             onClick={
               refresh
@@ -205,7 +237,7 @@ export function OnlineFriendsPanel({
               'center',
           }}
         >
-          Loading online friends\u2026
+          {"Checking who's online\u2026"}
         </div>
       )}
 
@@ -245,104 +277,113 @@ export function OnlineFriendsPanel({
         state.friends
           .length >
           0 && (
-        <table className="rtable">
-          <tbody>
-            <tr>
-              <th
-                className="left"
-                style={{
-                  width:
-                    '2.25em',
-                }}
-              >
-                &nbsp;
-              </th>
-              <th>
-                User
-              </th>
-              <th
-                style={{
-                  width:
-                    '5em',
-                }}
-              >
-                Rating
-              </th>
-            </tr>
+        <div
+          className="cfpm-list-scroll"
+          style={{
+            maxHeight: 260,
+            overflowY:
+              'auto',
+          }}
+        >
+          <table className="rtable">
+            <tbody>
+              <tr>
+                <th
+                  className="left"
+                  style={{
+                    width:
+                      '2.25em',
+                  }}
+                >
+                  &nbsp;
+                </th>
+                <th>
+                  User
+                </th>
+                <th
+                  style={{
+                    width:
+                      '5em',
+                  }}
+                >
+                  Rating
+                </th>
+              </tr>
 
-            {state.friends.map(
-              (
-                friend,
-                index,
-              ) => {
-                const dark =
-                  index %
-                    2 ===
-                  0;
+              {state.friends.map(
+                (
+                  friend,
+                  index,
+                ) => {
+                  const dark =
+                    index %
+                      2 ===
+                    0;
 
-                return (
-                  <tr
-                    key={
-                      friend.handle
-                    }
-                  >
-                    <td
-                      className={
-                        dark
-                          ? 'left dark'
-                          : 'left'
-                      }
-                      title="Online now"
-                    >
-                      <span
-                        style={{
-                          display:
-                            'inline-block',
-                          width: 7,
-                          height: 7,
-                          borderRadius:
-                            '50%',
-                          background:
-                            '#2ecc71',
-                        }}
-                      />
-                    </td>
-
-                    <td
-                      className={
-                        dark
-                          ? 'dark'
-                          : ''
+                  return (
+                    <tr
+                      key={
+                        friend.handle
                       }
                     >
-                      <RatedHandle
-                        handle={
-                          friend.handle
+                      <td
+                        className={
+                          dark
+                            ? 'left dark'
+                            : 'left'
                         }
-                        rank={
-                          friend.rank
-                        }
-                      />
-                    </td>
+                        title="Online now"
+                      >
+                        <span
+                          style={{
+                            display:
+                              'inline-block',
+                            width: 7,
+                            height: 7,
+                            borderRadius:
+                              '50%',
+                            background:
+                              '#2ecc71',
+                          }}
+                        />
+                      </td>
 
-                    <td
-                      className={
-                        dark
-                          ? 'dark'
-                          : ''
-                      }
-                    >
-                      {typeof friend.rating ===
-                      'number'
-                        ? friend.rating
-                        : '\u2014'}
-                    </td>
-                  </tr>
-                );
-              },
-            )}
-          </tbody>
-        </table>
+                      <td
+                        className={
+                          dark
+                            ? 'dark'
+                            : ''
+                        }
+                      >
+                        <RatedHandle
+                          handle={
+                            friend.handle
+                          }
+                          rank={
+                            friend.rank
+                          }
+                        />
+                      </td>
+
+                      <td
+                        className={
+                          dark
+                            ? 'dark'
+                            : ''
+                        }
+                      >
+                        {typeof friend.rating ===
+                        'number'
+                          ? friend.rating
+                          : '\u2014'}
+                      </td>
+                    </tr>
+                  );
+                },
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

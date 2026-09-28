@@ -6,6 +6,7 @@ import {
 } from 'react';
 
 import { PerformanceMirror } from '../components/PerformanceMirror';
+import { OnlineFriendsPanel } from '../components/friends/OnlineFriendsPanel';
 import { useTheme } from '../hooks/useTheme';
 import { normalizeSettings } from '../domain/settings';
 import { PerformanceEngine } from '../domain/performanceEngine';
@@ -24,6 +25,7 @@ import {
 
 import {
   mountExtension,
+  mountOnlineFriendsHost,
   observeWidth,
 } from './mount';
 
@@ -60,9 +62,6 @@ interface AppProps {
   initialEnabled:
     boolean;
 
-  onlineFriendsHost:
-    HTMLElement | null;
-
   onSettingsChange:
     (
       settings: ExtensionSettings,
@@ -79,7 +78,6 @@ interface AppProps {
 function App({
   initialSettings,
   initialEnabled,
-  onlineFriendsHost,
   onSettingsChange,
   onEnabledChange,
   loadState,
@@ -244,9 +242,6 @@ function App({
         initialEnabled={
           initialEnabled
         }
-        onlineFriendsHost={
-          onlineFriendsHost
-        }
         theme={theme}
         onSettingsChange={
           onSettingsChange
@@ -377,12 +372,7 @@ function createEngine(
   });
 }
 
-function Root({
-  onlineFriendsHost,
-}: {
-  onlineFriendsHost:
-    HTMLElement | null;
-}) {
+function Root() {
   const settings =
     useMemo(
       () =>
@@ -500,9 +490,6 @@ function Root({
       initialEnabled={
         initialEnabled
       }
-      onlineFriendsHost={
-        onlineFriendsHost
-      }
       onSettingsChange={
         saveCurrentSettings
       }
@@ -516,7 +503,81 @@ function Root({
   );
 }
 
+function ensureStylesInjected(): void {
+  const styleId =
+    'cfpm-toggle-style';
+
+  const oldStyle =
+    document.getElementById(
+      styleId,
+    );
+
+  if (oldStyle) {
+    return;
+  }
+
+  const style =
+    document.createElement(
+      'style',
+    );
+
+  style.id =
+    styleId;
+
+  style.textContent = css;
+
+  document.head.appendChild(
+    style,
+  );
+}
+
+/*
+ * The Online Friends box is independent of the
+ * full performance-mirror app: it should appear
+ * in the Codeforces sidebar on any page that has
+ * one (contest pages, blog pages, problem pages,
+ * ...), not only on /profile/* pages. Mounted
+ * separately from Root/App/PerformanceMirror so it
+ * doesn't depend on being on a profile page at all.
+ */
+function mountOnlineFriendsWidget(): void {
+  const host =
+    mountOnlineFriendsHost();
+
+  if (!host) {
+    return;
+  }
+
+  if (
+    host.dataset
+      .cfpmMounted ===
+    'true'
+  ) {
+    return;
+  }
+
+  host.dataset.cfpmMounted =
+    'true';
+
+  const settings =
+    normalizeSettings(
+      loadSettings(),
+    );
+
+  createRoot(host).render(
+    <OnlineFriendsPanel
+      visible={
+        settings.friendsVisible
+      }
+    />,
+  );
+}
+
 function installApp(): void {
+  ensureStylesInjected();
+
+  mountOnlineFriendsWidget();
+
   if (
     document.getElementById(
       'cfpm-compact',
@@ -541,7 +602,6 @@ function installApp(): void {
   const {
     host,
     appRoot,
-    onlineFriendsHost,
     widthSource,
   } =
     mountExtension();
@@ -551,38 +611,10 @@ function installApp(): void {
     widthSource,
   );
 
-  const styleId =
-    'cfpm-toggle-style';
-
-  const oldStyle =
-    document.getElementById(
-      styleId,
-    );
-
-  if (!oldStyle) {
-    const style =
-      document.createElement(
-        'style',
-      );
-
-    style.id =
-      styleId;
-
-    style.textContent = css;
-
-    document.head.appendChild(
-      style,
-    );
-  }
-
   createRoot(
     appRoot,
   ).render(
-    <Root
-      onlineFriendsHost={
-        onlineFriendsHost
-      }
-    />,
+    <Root />,
   );
 }
 

@@ -71,7 +71,7 @@ function findSidebarBoxByText(
   return null;
 }
 
-function mountOnlineFriendsHost():
+export function mountOnlineFriendsHost():
   HTMLElement | null {
   const existing =
     document.getElementById(

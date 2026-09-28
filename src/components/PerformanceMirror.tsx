@@ -4,10 +4,6 @@ import {
   useState,
 } from 'react';
 
-import {
-  createPortal,
-} from 'react-dom';
-
 import type {
   CSSProperties,
 } from 'react';
@@ -49,16 +45,10 @@ import {
   FrictionPanel,
 } from './friction/FrictionPanel';
 
-import {
-  OnlineFriendsPanel,
-} from './friends/OnlineFriendsPanel';
-
 interface Props {
   engine: PerformanceEngine;
   initialSettings: ExtensionSettings;
   initialEnabled: boolean;
-  onlineFriendsHost:
-    HTMLElement | null;
   theme: Theme;
 
   onSettingsChange:
@@ -135,7 +125,6 @@ export function PerformanceMirror({
   engine,
   initialSettings,
   initialEnabled,
-  onlineFriendsHost,
   theme,
   onSettingsChange,
   onEnabledChange,
@@ -454,19 +443,6 @@ export function PerformanceMirror({
           }
         />
       </div>
-
-      {onlineFriendsHost &&
-        createPortal(
-          <OnlineFriendsPanel
-            theme={
-              theme
-            }
-            visible={
-              settings.friendsVisible
-            }
-          />,
-          onlineFriendsHost,
-        )}
     </>
   );
 }
