@@ -1,7 +1,20 @@
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
   getRatedUserClassName,
   isLegendaryRank,
 } from '../../domain/utils';
+
+import {
+  hasSolved,
+  parseProblemPage,
+  submissionsForProblem,
+} from '../../domain/friendSubmissions';
 
 import {
   buildProfileUrl,
@@ -12,8 +25,16 @@ import {
 } from '../../hooks/useFriendsVisible';
 
 import {
+  useFriendProblemSubmissions,
+} from '../../hooks/useFriendProblemSubmissions';
+
+import {
   useOnlineFriends,
 } from '../../hooks/useOnlineFriends';
+
+import {
+  FriendSubmissionsPopup,
+} from './FriendSubmissionsPopup';
 
 /*
  * Max height (px) of the friend list. Longer
@@ -22,6 +43,9 @@ import {
  */
 const LIST_MAX_HEIGHT =
   260;
+
+const NO_HANDLES: string[] =
+  [];
 
 function timeAgoLabel(
   updatedAt: number,
@@ -165,6 +189,29 @@ function RefreshIcon() {
   );
 }
 
+function SubmissionsIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  );
+}
+
 export function OnlineFriendsPanel() {
   const visible =
     useFriendsVisible();
@@ -178,9 +225,112 @@ export function OnlineFriendsPanel() {
       visible,
     );
 
+  /*
+   * Set only on a problem page of a regular contest
+   * (null everywhere else, which switches the whole
+   * "friend's submissions" feature off: no requests,
+   * no extra markup).
+   */
+  const problem =
+    useMemo(
+      () =>
+        parseProblemPage(
+          window.location
+            .pathname,
+        ),
+      [],
+    );
+
+  const friendHandles =
+    useMemo(
+      () =>
+        state.status ===
+        'ready'
+          ? state.friends.map(
+              friend =>
+                friend.handle,
+            )
+          : NO_HANDLES,
+      [state],
+    );
+
+  const submissionEntries =
+    useFriendProblemSubmissions(
+      problem,
+      friendHandles,
+    );
+
+  const [openFriend, setOpenFriend] =
+    useState<{
+      handle: string;
+      anchor: HTMLElement;
+    } | null>(null);
+
+  const closePopup =
+    useCallback(() => {
+      setOpenFriend(null);
+    }, []);
+
+  /*
+   * Drop the popup if its friend goes offline (their
+   * row, and so the popup's anchor, disappears) or the
+   * whole box is hidden.
+   */
+  useEffect(() => {
+    if (!openFriend) {
+      return;
+    }
+
+    const stillListed =
+      visible &&
+      state.status ===
+        'ready' &&
+      state.friends.some(
+        friend =>
+          friend.handle ===
+          openFriend.handle,
+      );
+
+    if (!stillListed) {
+      setOpenFriend(null);
+    }
+  }, [
+    visible,
+    state,
+    openFriend,
+  ]);
+
   if (!visible) {
     return null;
   }
+
+  const openedFriend =
+    openFriend &&
+    state.status ===
+      'ready'
+      ? state.friends.find(
+          friend =>
+            friend.handle ===
+            openFriend.handle,
+        )
+      : undefined;
+
+  const openedEntry =
+    openedFriend
+      ? submissionEntries[
+          openedFriend.handle.toLowerCase()
+        ]
+      : undefined;
+
+  const openedSubmissions =
+    problem &&
+    openedEntry?.status ===
+      'ready'
+      ? submissionsForProblem(
+          openedEntry.submissions,
+          problem.index,
+        )
+      : [];
 
   /*
    * A click while a load is already running would
@@ -330,6 +480,37 @@ export function OnlineFriendsPanel() {
                       2 ===
                     0;
 
+                  const entry =
+                    problem
+                      ? submissionEntries[
+                          friend.handle.toLowerCase()
+                        ]
+                      : undefined;
+
+                  const solved =
+                    problem !==
+                      null &&
+                    entry?.status ===
+                      'ready' &&
+                    hasSolved(
+                      submissionsForProblem(
+                        entry.submissions,
+                        problem.index,
+                      ),
+                    );
+
+                  const handleLink =
+                    (
+                      <RatedHandle
+                        handle={
+                          friend.handle
+                        }
+                        rank={
+                          friend.rank
+                        }
+                      />
+                    );
+
                   return (
                     <tr
                       key={
@@ -365,14 +546,45 @@ export function OnlineFriendsPanel() {
                             : ''
                         }
                       >
-                        <RatedHandle
-                          handle={
-                            friend.handle
-                          }
-                          rank={
-                            friend.rank
-                          }
-                        />
+                        {problem ? (
+                          <div className="cfpm-friend-user">
+                            {handleLink}
+
+                            {solved && (
+                              <button
+                                type="button"
+                                className="cfpm-friend-sub-btn"
+                                title={`${friend.handle}'s submissions for this problem`}
+                                aria-label={`Show ${friend.handle}'s submissions for this problem`}
+                                aria-haspopup="dialog"
+                                aria-expanded={
+                                  openFriend?.handle ===
+                                  friend.handle
+                                }
+                                onClick={event => {
+                                  const anchor =
+                                    event.currentTarget;
+
+                                  setOpenFriend(
+                                    current =>
+                                      current?.handle ===
+                                      friend.handle
+                                        ? null
+                                        : {
+                                            handle:
+                                              friend.handle,
+                                            anchor,
+                                          },
+                                  );
+                                }}
+                              >
+                                <SubmissionsIcon />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          handleLink
+                        )}
                       </td>
 
                       <td
@@ -428,6 +640,35 @@ export function OnlineFriendsPanel() {
           {countLabel}
         </span>
       </div>
+
+      {problem &&
+        openFriend &&
+        openedFriend &&
+        openedSubmissions.length >
+          0 && (
+          <FriendSubmissionsPopup
+            title={
+              <RatedHandle
+                handle={
+                  openedFriend.handle
+                }
+                rank={
+                  openedFriend.rank
+                }
+              />
+            }
+            problem={problem}
+            submissions={
+              openedSubmissions
+            }
+            anchor={
+              openFriend.anchor
+            }
+            onClose={
+              closePopup
+            }
+          />
+        )}
     </div>
   );
 }

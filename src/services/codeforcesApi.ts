@@ -6,6 +6,10 @@ import type {
   CodeforcesUser,
 } from '../types/codeforces';
 
+import {
+  createPacedApiClient,
+} from './pacedApi';
+
 const API_BASE =
   'https://codeforces.com/api';
 
@@ -89,6 +93,78 @@ export async function fetchUserDataset(
     submissions,
     ratingHistory,
   };
+}
+
+/*
+ * One request per online friend is made when a problem
+ * page is opened (see useFriendProblemSubmissions), so
+ * these calls go through a serial, rate-aware queue
+ * instead of firing in parallel: Codeforces documents a
+ * limit of one API request per two seconds.
+ *
+ * A non-2xx reply can still carry the API's own JSON
+ * error ("Call limit exceeded"), so the body is parsed
+ * before the HTTP status is judged.
+ */
+const pacedApi =
+  createPacedApiClient({
+    fetchJson: async path => {
+      const response =
+        await fetch(
+          `${API_BASE}${path}`,
+          {
+            cache: 'no-store',
+          },
+        );
+
+      let body: unknown =
+        null;
+
+      try {
+        body =
+          await response.json();
+      } catch {
+        body = null;
+      }
+
+      if (
+        body &&
+        typeof body ===
+          'object' &&
+        'status' in body
+      ) {
+        return body;
+      }
+
+      throw new Error(
+        `Codeforces API HTTP ${response.status}`,
+      );
+    },
+  });
+
+/*
+ * Every submission `handle` made in one contest,
+ * including practice and virtual ones, newest first.
+ * contestId must be a positive integer.
+ */
+export async function fetchContestSubmissionsByHandle(
+  contestId: number,
+  handle: string,
+): Promise<
+  CodeforcesSubmission[]
+> {
+  const result =
+    await pacedApi.get<
+      CodeforcesSubmission[]
+    >(
+      `/contest.status?contestId=${contestId}&handle=${encodeURIComponent(handle)}`,
+    );
+
+  return Array.isArray(
+    result,
+  )
+    ? result
+    : [];
 }
 
 /*

@@ -272,3 +272,35 @@
   .cfpm-friends-refresh.cfpm-spinning svg { animation: none; }
   .cfpm-friends-refresh.cfpm-spinning { opacity: 0.5; }
 }
+
+/* ---- Friend's submissions on the current problem (problem pages only) ---- */
+
+/* Handle on the left, tiny button on the right, inside the User cell. */
+.cfpm-friend-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+.cfpm-friend-user > a { min-width: 0; overflow-wrap: anywhere; }
+
+.cfpm-friend-sub-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto;
+  width: 18px; height: 18px; margin: 0; padding: 0;
+  border: 0; border-radius: 3px; background: transparent;
+  color: #999999; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.cfpm-friend-sub-btn:hover,
+.cfpm-friend-sub-btn[aria-expanded="true"] { color: #3b5998; background: rgba(128,128,128,0.15); }
+.cfpm-friend-sub-btn:focus-visible { outline: 2px solid rgba(59,89,152,0.6); outline-offset: 1px; }
+.cfpm-friend-sub-btn svg { display: block; }
+
+#cfpm-fsub-popup-list::-webkit-scrollbar { width: 4px; }
+#cfpm-fsub-popup-list::-webkit-scrollbar-track { background: transparent; }
+#cfpm-fsub-popup-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-height: 24px; }
+
+.cfpm-fsub-row { transition: opacity 0.1s ease; }
+a.cfpm-fsub-row:hover { opacity: 0.72; }

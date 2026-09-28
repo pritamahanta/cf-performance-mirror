@@ -22,13 +22,17 @@ export interface CodeforcesProblem {
   tags: string[];
 }
 
+export interface CodeforcesParty {
+  participantType?: string;
+}
+
 export interface CodeforcesSubmission {
   id: number;
   contestId?: number;
   creationTimeSeconds: number;
   relativeTimeSeconds?: number;
   problem: CodeforcesProblem;
-  author?: unknown;
+  author?: CodeforcesParty;
   programmingLanguage?: string;
   verdict?: string;
   testset?: string;
