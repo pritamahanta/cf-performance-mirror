@@ -27,9 +27,26 @@ import type {
 
 import { useTheme } from '../../hooks/useTheme';
 
-const POPUP_WIDTH = 320;
+/*
+ * The popup is as wide as its content needs (a row is two short
+ * lines), within these bounds.
+ */
+const POPUP_MIN_WIDTH = 190;
+const POPUP_MAX_WIDTH = 280;
 const LIST_MAX_HEIGHT = 260;
 const EDGE_GAP = 8;
+
+/*
+ * Preferred placement: beside the friends box (to its left),
+ * level with the clicked row, with a small arrow pointing at the
+ * row - so the friends list stays fully visible and clickable.
+ * ARROW_SIZE is the side of the rotated square used as the arrow;
+ * its tip sticks out ~0.7 * ARROW_SIZE past the popup edge, which
+ * SIDE_GAP has to leave room for.
+ */
+const SIDE_GAP = 10;
+const ARROW_SIZE = 8;
+const ARROW_EDGE_MARGIN = 10;
 
 /*
  * A user can have hundreds of submissions on one problem. Only
@@ -98,6 +115,21 @@ function isEventInside(
   );
 }
 
+interface Position {
+  top: number;
+  left: number;
+  /*
+   * Set only for the beside-the-box placement: where the arrow
+   * on the popup's right edge sits (its centre, in px from the
+   * popup's top) and whether that spot is over the header
+   * (so the arrow can match the header's colour).
+   */
+  arrow: {
+    top: number;
+    overHeader: boolean;
+  } | null;
+}
+
 interface Props {
   /* Rendered in the header (the friend's colored handle). */
   title: ReactNode;
@@ -127,10 +159,16 @@ export function FriendSubmissionsPopup({
       null,
     );
 
+  const headerRef =
+    useRef<HTMLDivElement>(
+      null,
+    );
+
   const [position, setPosition] =
-    useState({
+    useState<Position>({
       top: -9999,
       left: -9999,
+      arrow: null,
     });
 
   const [visibleCount, setVisibleCount] =
@@ -168,16 +206,97 @@ export function FriendSubmissionsPopup({
 
     const width =
       popup.offsetWidth ||
-      POPUP_WIDTH;
+      POPUP_MIN_WIDTH;
 
     const height =
       popup.offsetHeight ||
       180;
 
+    const box =
+      anchor.closest(
+        '.sidebox',
+      ) ??
+      anchor.closest(
+        '.roundbox',
+      );
+
+    const sideLeft =
+      box
+        ? box.getBoundingClientRect()
+            .left -
+          width -
+          SIDE_GAP
+        : -1;
+
+    if (
+      sideLeft >=
+      EDGE_GAP
+    ) {
+      const headerHeight =
+        headerRef.current
+          ?.offsetHeight ??
+        30;
+
+      const anchorMiddle =
+        rect.top +
+        rect.height / 2;
+
+      /*
+       * Put the arrow at the header's vertical centre
+       * (1px is the popup's border) so it lines up with
+       * the row; near the top/bottom of the viewport the
+       * popup is clamped and the arrow slides instead.
+       */
+      const top =
+        Math.min(
+          Math.max(
+            EDGE_GAP,
+            anchorMiddle -
+              (1 +
+                headerHeight /
+                  2),
+          ),
+          Math.max(
+            EDGE_GAP,
+            viewH -
+              height -
+              EDGE_GAP,
+          ),
+        );
+
+      const arrowTop =
+        Math.min(
+          Math.max(
+            ARROW_EDGE_MARGIN,
+            anchorMiddle -
+              top,
+          ),
+          Math.max(
+            ARROW_EDGE_MARGIN,
+            height -
+              ARROW_EDGE_MARGIN,
+          ),
+        );
+
+      setPosition({
+        top,
+        left: sideLeft,
+        arrow: {
+          top: arrowTop,
+          overHeader:
+            arrowTop <
+            1 +
+              headerHeight,
+        },
+      });
+
+      return;
+    }
+
     /*
-     * The sidebar sits at the right edge of the page, so
-     * line the popup's right edge up with the button and
-     * let it extend leftwards; then clamp to the viewport.
+     * Not enough room beside the box (narrow window):
+     * open just below the button, right edges lined up,
+     * or above it when there is no room underneath.
      */
     let left =
       rect.right - width;
@@ -208,6 +327,7 @@ export function FriendSubmissionsPopup({
     setPosition({
       top,
       left,
+      arrow: null,
     });
   }, [
     anchor,
@@ -321,29 +441,42 @@ export function FriendSubmissionsPopup({
     neutral: theme.muted,
   };
 
+  /*
+   * Two layers: the outer one is positioned and carries the arrow
+   * (which sticks out past the edge, so it cannot clip); the inner
+   * one has the border, rounded corners and clipping.
+   */
   const style: CSSProperties =
     {
       position: 'fixed',
       zIndex: 999999,
       top: position.top,
       left: position.left,
-      width: POPUP_WIDTH,
-      maxWidth: `calc(100vw - ${EDGE_GAP * 2}px)`,
+      width: 'max-content',
+      minWidth:
+        POPUP_MIN_WIDTH,
+      maxWidth: `min(${POPUP_MAX_WIDTH}px, calc(100vw - ${EDGE_GAP * 2}px))`,
       boxSizing:
         'border-box',
-      borderRadius: 7,
+      color: theme.text,
+      fontFamily:
+        'Arial, sans-serif',
+    };
+
+  const surfaceStyle: CSSProperties =
+    {
+      boxSizing:
+        'border-box',
+      borderRadius: 6,
       overflow: 'hidden',
       boxShadow:
-        '0 10px 36px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12)',
+        '0 6px 22px rgba(0,0,0,0.20), 0 1px 5px rgba(0,0,0,0.12)',
       display: 'flex',
       flexDirection:
         'column',
       background:
         theme.dropdownBg,
-      color: theme.text,
       border: `1px solid ${theme.dropdownBorder}`,
-      fontFamily:
-        'Arial, sans-serif',
     };
 
   const count =
@@ -374,10 +507,12 @@ export function FriendSubmissionsPopup({
       aria-label="Friend submissions"
       style={style}
     >
+      <div style={surfaceStyle}>
       <div
+        ref={headerRef}
         style={{
           padding:
-            '8px 12px 7px',
+            '6px 10px 6px 10px',
           fontSize: 12,
           fontWeight: 700,
           color:
@@ -434,7 +569,7 @@ export function FriendSubmissionsPopup({
               'transparent',
             border: 0,
             padding:
-              '2px 4px',
+              '2px 2px 2px 6px',
             cursor:
               'pointer',
             opacity: 0.55,
@@ -473,7 +608,7 @@ export function FriendSubmissionsPopup({
                 display:
                   'block',
                 padding:
-                  '6px 12px',
+                  '5px 10px',
                 textDecoration:
                   'none',
                 fontSize: 12,
@@ -579,7 +714,7 @@ export function FriendSubmissionsPopup({
                 'block',
               width: '100%',
               padding:
-                '7px 12px',
+                '6px 10px',
               border: 0,
               borderTop: `1px solid ${theme.borderLighter}`,
               background:
@@ -600,6 +735,40 @@ export function FriendSubmissionsPopup({
           </button>
         )}
       </div>
+      </div>
+
+      {position.arrow && (
+        <span
+          aria-hidden="true"
+          style={{
+            position:
+              'absolute',
+            right:
+              -ARROW_SIZE / 2,
+            top:
+              position.arrow
+                .top -
+              ARROW_SIZE / 2,
+            width:
+              ARROW_SIZE,
+            height:
+              ARROW_SIZE,
+            boxSizing:
+              'border-box',
+            transform:
+              'rotate(45deg)',
+            pointerEvents:
+              'none',
+            background:
+              position.arrow
+                .overHeader
+                ? theme.dropdownSection
+                : theme.dropdownBg,
+            borderTop: `1px solid ${theme.dropdownBorder}`,
+            borderRight: `1px solid ${theme.dropdownBorder}`,
+          }}
+        />
+      )}
     </div>
   );
 

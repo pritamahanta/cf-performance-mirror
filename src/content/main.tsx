@@ -42,6 +42,43 @@ import css from '../styles/performance-mirror.css?inline';
 const HANDLE_RE =
   /^[a-zA-Z0-9_\-.]{2,24}$/;
 
+/*
+ * The performance panel belongs on a user's profile page
+ * only, i.e. /profile/<handle>. It must not be inferred from
+ * "the second path segment", which on other pages is not a
+ * handle at all (/contest/2269/problem/B -> "2269",
+ * /blog/entry/12345 -> "12345") but still passes HANDLE_RE.
+ */
+const PROFILE_PATH_RE =
+  /^\/profile\/([^/]+)\/?$/;
+
+function getProfileHandle():
+  string | null {
+  const match =
+    PROFILE_PATH_RE.exec(
+      window.location.pathname,
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  let handle: string;
+
+  try {
+    handle =
+      decodeURIComponent(
+        match[1],
+      ).trim();
+  } catch {
+    return null;
+  }
+
+  return HANDLE_RE.test(handle)
+    ? handle
+    : null;
+}
+
 type LoadState =
   | {
       status: 'loading';
@@ -398,15 +435,9 @@ function Root() {
       false;
 
     const handle =
-      (
-        window.location.pathname
-          .split('/')[2] ||
-        ''
-      ).trim();
+      getProfileHandle();
 
-    if (
-      !HANDLE_RE.test(handle)
-    ) {
+    if (!handle) {
       setLoadState({
         status: 'error',
         message:
@@ -575,23 +606,19 @@ function installApp(): void {
 
   mountOnlineFriendsWidget();
 
+  /*
+   * Everything below is the full performance panel, which
+   * is shown on profile pages only. Other pages get just
+   * the Online Friends box mounted above.
+   */
+  if (!getProfileHandle()) {
+    return;
+  }
+
   if (
     document.getElementById(
       'cfpm-compact',
     )
-  ) {
-    return;
-  }
-
-  const handle =
-    (
-      window.location.pathname
-        .split('/')[2] ||
-      ''
-    ).trim();
-
-  if (
-    !HANDLE_RE.test(handle)
   ) {
     return;
   }

@@ -385,7 +385,7 @@ export function OnlineFriendsPanel() {
   return (
     <div className="roundbox sidebox borderTopRound">
       <div className="caption titled">
-        {'\u2192 Online Friends'}
+        {'\u2192 Online friends'}
       </div>
 
       {state.status ===
