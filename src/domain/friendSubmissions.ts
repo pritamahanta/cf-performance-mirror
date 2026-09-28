@@ -15,6 +15,8 @@ export interface ProblemRef {
 /*
  * Compact, storage-friendly copy of the few Submission fields the
  * popup needs. Everything except id/index/createdAt can be absent.
+ * Only fields that are actually displayed are kept, so cached
+ * entries for users with very many submissions stay small.
  */
 export interface FriendSubmission {
   id: number;
@@ -26,12 +28,9 @@ export interface FriendSubmission {
    * set for submissions made as a contestant / virtual participant.
    */
   contestSeconds?: number;
-  language?: string;
   verdict?: string;
   testset?: string;
   passedTestCount?: number;
-  timeMs?: number;
-  memoryBytes?: number;
 }
 
 /*
@@ -113,12 +112,9 @@ export function compactSubmission(
     createdAt: raw.creationTimeSeconds,
     participantType,
     contestSeconds: hasContestTime ? relative : undefined,
-    language: raw.programmingLanguage,
     verdict: raw.verdict,
     testset: raw.testset,
     passedTestCount: raw.passedTestCount,
-    timeMs: raw.timeConsumedMillis,
-    memoryBytes: raw.memoryConsumedBytes,
   };
 }
 
@@ -273,9 +269,7 @@ function participationLabel(
 
 /*
  * Second line of a popup row, e.g.
- * "Contest +1:02 · Sep 3, 2025, 14:30 · 62 ms · 4100 KB".
- * Runtime/memory are shown for accepted runs only, where they are
- * useful for comparing solutions.
+ * "Contest +1:02 · Sep 3, 2025, 14:30".
  */
 export function submissionMeta(
   submission: FriendSubmission,
@@ -293,19 +287,6 @@ export function submissionMeta(
   }
 
   parts.push(formatDate(submission.createdAt));
-
-  if (submission.verdict === 'OK') {
-    if (typeof submission.timeMs === 'number') {
-      parts.push(`${submission.timeMs} ms`);
-    }
-
-    if (
-      typeof submission.memoryBytes === 'number' &&
-      submission.memoryBytes > 0
-    ) {
-      parts.push(`${Math.round(submission.memoryBytes / 1024)} KB`);
-    }
-  }
 
   return parts.join(' \u00b7 ');
 }

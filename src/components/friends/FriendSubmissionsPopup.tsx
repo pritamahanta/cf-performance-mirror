@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -29,6 +30,14 @@ import { useTheme } from '../../hooks/useTheme';
 const POPUP_WIDTH = 320;
 const LIST_MAX_HEIGHT = 260;
 const EDGE_GAP = 8;
+
+/*
+ * A user can have hundreds of submissions on one problem. Only
+ * this many rows are rendered at first, and each click on
+ * "Show more" adds another batch, so opening the popup stays
+ * instant however long the list is.
+ */
+const PAGE_SIZE = 30;
 
 function formatDate(
   unixSeconds: number,
@@ -67,6 +76,28 @@ function isInside(
   );
 }
 
+/*
+ * Like isInside, but for a whole event. composedPath() is fixed
+ * when the event is dispatched, so it still includes the popup
+ * when the clicked element was removed from the page by the
+ * time this runs (e.g. the "Show more" button disappearing after
+ * it loads the last batch). Without it that click would look
+ * like a click outside the popup and close it.
+ */
+function isEventInside(
+  container: Element | null,
+  event: Event,
+): boolean {
+  if (container === null) {
+    return false;
+  }
+
+  return (
+    event.composedPath().includes(container) ||
+    isInside(container, event.target)
+  );
+}
+
 interface Props {
   /* Rendered in the header (the friend's colored handle). */
   title: ReactNode;
@@ -101,6 +132,9 @@ export function FriendSubmissionsPopup({
       top: -9999,
       left: -9999,
     });
+
+  const [visibleCount, setVisibleCount] =
+    useState(PAGE_SIZE);
 
   useLayoutEffect(() => {
     const popup =
@@ -194,13 +228,13 @@ export function FriendSubmissionsPopup({
        * the popup is still bubbling.
        */
       if (
-        isInside(
+        isEventInside(
           anchor,
-          event.target,
+          event,
         ) ||
-        isInside(
+        isEventInside(
           popupRef.current,
-          event.target,
+          event,
         )
       ) {
         return;
@@ -315,6 +349,23 @@ export function FriendSubmissionsPopup({
   const count =
     submissions.length;
 
+  const visibleSubmissions =
+    useMemo(
+      () =>
+        submissions.slice(
+          0,
+          visibleCount,
+        ),
+      [
+        submissions,
+        visibleCount,
+      ],
+    );
+
+  const remaining =
+    count -
+    visibleSubmissions.length;
+
   const content = (
     <div
       ref={popupRef}
@@ -365,7 +416,7 @@ export function FriendSubmissionsPopup({
               'nowrap',
           }}
         >
-          {`${problem.contestId}${problem.index} \u00b7 ${count} submission${
+          {`${count} submission${
             count === 1
               ? ''
               : 's'
@@ -406,7 +457,7 @@ export function FriendSubmissionsPopup({
             'contain',
         }}
       >
-        {submissions.map(
+        {visibleSubmissions.map(
           (
             submission,
             index,
@@ -449,43 +500,18 @@ export function FriendSubmissionsPopup({
               <>
                 <div
                   style={{
-                    display:
-                      'flex',
-                    alignItems:
-                      'baseline',
-                    justifyContent:
-                      'space-between',
-                    gap: 8,
+                    fontWeight: 700,
+                    color:
+                      toneColor[
+                        verdictTone(
+                          submission.verdict,
+                        )
+                      ],
                   }}
                 >
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      color:
-                        toneColor[
-                          verdictTone(
-                            submission.verdict,
-                          )
-                        ],
-                    }}
-                  >
-                    {verdictLabel(
-                      submission,
-                    )}
-                  </span>
-
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color:
-                        theme.muted,
-                      textAlign:
-                        'right',
-                    }}
-                  >
-                    {submission.language ??
-                      ''}
-                  </span>
+                  {verdictLabel(
+                    submission,
+                  )}
                 </div>
 
                 <div
@@ -534,6 +560,44 @@ export function FriendSubmissionsPopup({
               </div>
             );
           },
+        )}
+
+        {remaining >
+          0 && (
+          <button
+            type="button"
+            className="cfpm-fsub-more"
+            onClick={() => {
+              setVisibleCount(
+                current =>
+                  current +
+                  PAGE_SIZE,
+              );
+            }}
+            style={{
+              display:
+                'block',
+              width: '100%',
+              padding:
+                '7px 12px',
+              border: 0,
+              borderTop: `1px solid ${theme.borderLighter}`,
+              background:
+                'transparent',
+              color:
+                theme.problemLink,
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily:
+                'inherit',
+              textAlign:
+                'center',
+              cursor:
+                'pointer',
+            }}
+          >
+            {`Show more (${remaining} remaining)`}
+          </button>
         )}
       </div>
     </div>
