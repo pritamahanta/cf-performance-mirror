@@ -6,6 +6,7 @@ import {
 
 import {
   fetchOnlineFriends,
+  fetchOnlineHandles,
   fetchUsersInfo,
 } from '../services/codeforcesApi';
 
@@ -17,21 +18,15 @@ import type {
   OnlineFriend,
 } from '../domain/friends';
 
-const REFRESH_INTERVAL_MS =
-  60_000;
-
 /*
- * Codeforces exposes lastOnlineTimeSeconds
- * through user.info.
- *
- * Codeforces' own site treats a user as "online"
- * if seen within the last 15 minutes (not 5) -
- * matching that window here is what keeps this
- * list in sync with what codeforces.com itself
- * shows as online.
+ * Checking online status now means one request
+ * per friend (see fetchOnlineHandles), not one
+ * batched API call, so refreshing every 2 minutes
+ * instead of every 1 keeps request volume more
+ * reasonable.
  */
-const ONLINE_THRESHOLD_SECONDS =
-  15 * 60;
+const REFRESH_INTERVAL_MS =
+  120_000;
 
 const LOAD_ERROR_MESSAGE =
   "Couldn't load your online friends. Make sure you're logged in to Codeforces.";
@@ -107,7 +102,9 @@ export function useOnlineFriends(
 
         /*
          * This now executes user.info from
-         * the extension service worker.
+         * the extension service worker. Used
+         * only for rating/rank display - not
+         * for online status (see below).
          */
         const infos =
           handles.length > 0
@@ -116,47 +113,31 @@ export function useOnlineFriends(
               )
             : [];
 
-        const nowSeconds =
-          Math.floor(
-            Date.now() / 1000,
-          );
-
         /*
-         * Match Codeforces' commonly used
-         * "online now" interpretation:
-         * last seen within 15 minutes.
-         *
-         * Do not require diff >= 0 because
-         * the client clock and server clock may
-         * differ slightly.
+         * user.info's lastOnlineTimeSeconds can
+         * lag the live site by an hour or more,
+         * so online status is instead read
+         * directly off each friend's profile
+         * page, which reflects live data.
          */
-        const onlineInfos =
-          infos.filter(
-            info => {
-              const lastOnline =
-                info.lastOnlineTimeSeconds;
-
-              if (
-                typeof lastOnline !==
-                'number'
-              ) {
-                return false;
-              }
-
-              const diff =
-                nowSeconds -
-                lastOnline;
-
-              return (
-                diff <
-                ONLINE_THRESHOLD_SECONDS
-              );
-            },
-          );
+        const onlineHandleSet =
+          handles.length > 0
+            ? await fetchOnlineHandles(
+                handles,
+              )
+            : new Set<string>();
 
         if (cancelled) {
           return;
         }
+
+        const onlineInfos =
+          infos.filter(
+            info =>
+              onlineHandleSet.has(
+                info.handle,
+              ),
+          );
 
         const onlineHandles =
           onlineInfos.map(

@@ -237,6 +237,100 @@ export async function fetchOnlineFriends(): Promise<
   return handles;
 }
 
+/*
+ * user.info's lastOnlineTimeSeconds is served
+ * from a cache that can lag the live site by an
+ * hour or more, so it is not reliable for "is
+ * this person online right now".
+ *
+ * Each profile page itself is not cached the same
+ * way: it renders "Last visit: online now" (in
+ * green) directly from live data. Checking that
+ * text per-friend is slower (one request per
+ * friend) but is the only signal confirmed to be
+ * accurate.
+ */
+const PROFILE_ONLINE_PATTERN =
+  /Last visit:\s*(?:<[^>]+>\s*)*online now/i;
+
+const PROFILE_CHECK_CONCURRENCY =
+  10;
+
+async function isProfileOnlineNow(
+  handle: string,
+): Promise<boolean> {
+  try {
+    const response =
+      await fetch(
+        `https://codeforces.com/profile/${encodeURIComponent(
+          handle,
+        )}`,
+        {
+          cache: 'no-store',
+        },
+      );
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const html =
+      await response.text();
+
+    return PROFILE_ONLINE_PATTERN.test(
+      html,
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchOnlineHandles(
+  handles: string[],
+): Promise<Set<string>> {
+  const online =
+    new Set<string>();
+
+  for (
+    let i = 0;
+    i < handles.length;
+    i +=
+      PROFILE_CHECK_CONCURRENCY
+  ) {
+    const batch =
+      handles.slice(
+        i,
+        i +
+          PROFILE_CHECK_CONCURRENCY,
+      );
+
+    const results =
+      await Promise.all(
+        batch.map(
+          async handle => ({
+            handle,
+            online:
+              await isProfileOnlineNow(
+                handle,
+              ),
+          }),
+        ),
+      );
+
+    results.forEach(
+      result => {
+        if (result.online) {
+          online.add(
+            result.handle,
+          );
+        }
+      },
+    );
+  }
+
+  return online;
+}
+
 type ExtensionRuntime = {
   sendMessage: (
     message: unknown,
