@@ -559,17 +559,14 @@ function mountOnlineFriendsWidget(): void {
   host.dataset.cfpmMounted =
     'true';
 
-  const settings =
-    normalizeSettings(
-      loadSettings(),
-    );
-
+  /*
+   * The panel reads and follows the saved
+   * "friendsVisible" setting itself (see
+   * useFriendsVisible), so the toggle button on the
+   * profile page takes effect immediately.
+   */
   createRoot(host).render(
-    <OnlineFriendsPanel
-      visible={
-        settings.friendsVisible
-      }
-    />,
+    <OnlineFriendsPanel />,
   );
 }
 

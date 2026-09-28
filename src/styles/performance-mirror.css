@@ -227,3 +227,48 @@
   margin-bottom: 10px;
   box-sizing: border-box;
 }
+
+/* ---- Online Friends box (sidebar) ---- */
+
+/* Scrollable list: scrolls inside the box once it is taller than its max-height. */
+.cfpm-friends-list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Fixed footer row: never scrolls with the list. */
+.cfpm-friends-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 26px;
+  padding: 3px 8px 3px 10px;
+  border-top: 1px solid rgba(128,128,128,0.3);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.cfpm-friends-footer-group { display: flex; align-items: center; gap: 4px; }
+.cfpm-friends-count { opacity: 0.8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.cfpm-friends-refresh {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin: 0; padding: 0;
+  border: 0; border-radius: 3px; background: transparent;
+  color: #999999; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.cfpm-friends-refresh:hover { color: #3b5998; background: rgba(128,128,128,0.15); }
+.cfpm-friends-refresh:focus-visible { outline: 2px solid rgba(59,89,152,0.6); outline-offset: 1px; }
+.cfpm-friends-refresh svg { display: block; }
+
+/* Spin only while a user-initiated refresh is running. */
+.cfpm-friends-refresh.cfpm-spinning svg { animation: cfpm-spin 0.8s linear infinite; }
+@keyframes cfpm-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cfpm-friends-refresh.cfpm-spinning svg { animation: none; }
+  .cfpm-friends-refresh.cfpm-spinning { opacity: 0.5; }
+}

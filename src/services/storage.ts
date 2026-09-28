@@ -3,6 +3,11 @@ import type { ExtensionSettings, SavedSettings } from '../types/settings';
 export const SETTINGS_KEY = 'cfpm_defaults';
 export const TOGGLE_KEY = 'cfpm_enabled';
 
+// Fired on `window` (same tab) every time settings are saved. The Online Friends
+// panel lives in its own React root in the Codeforces sidebar, so it can't share
+// state with the profile-page controls; it listens for this instead.
+export const SETTINGS_CHANGED_EVENT = 'cfpm:settings-changed';
+
 export function loadSettings(storage: Storage = localStorage): SavedSettings {
   try {
     const raw = storage.getItem(SETTINGS_KEY);
@@ -16,6 +21,7 @@ export function loadSettings(storage: Storage = localStorage): SavedSettings {
 export function saveSettings(settings: Partial<ExtensionSettings>, storage: Storage = localStorage): void {
   try {
     storage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new Event(SETTINGS_CHANGED_EVENT));
   } catch {
     // Preserve legacy behavior: storage failures are non-fatal.
   }

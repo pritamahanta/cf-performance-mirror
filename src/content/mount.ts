@@ -43,6 +43,15 @@ function findProblemRatingsBox(): Element | null {
   return null;
 }
 
+/*
+ * Finds a sidebar box by its title. Matches on the
+ * box's own caption (e.g. "-> Top rated") rather
+ * than all of its text, so a box that merely
+ * mentions one of these phrases in its content
+ * (a "Pay attention" announcement, say) can't be
+ * mistaken for it. Boxes without a caption fall
+ * back to matching their whole text, as before.
+ */
 function findSidebarBoxByText(
   sidebar: Element,
   text: string,
@@ -56,13 +65,17 @@ function findSidebarBoxByText(
     );
 
   for (const box of boxes) {
-    const content =
-      box.textContent
+    const label =
+      (
+        box.querySelector(
+          '.caption',
+        ) ?? box
+      ).textContent
         ?.trim()
         .toLowerCase() ?? '';
 
     if (
-      content.includes(target)
+      label.includes(target)
     ) {
       return box;
     }
@@ -103,40 +116,59 @@ export function mountOnlineFriendsHost():
   host.style.boxSizing =
     'border-box';
 
-  const topContributors =
+  /*
+   * Top rated and Top contributors are each about
+   * ten rows tall, so placing the box below them
+   * pushes it off-screen on most displays. Put it
+   * directly above them instead, so it is visible
+   * without scrolling:
+   *
+   * (profile / Pay attention)
+   * Online Friends
+   * Top rated
+   * Top contributors
+   * Find user
+   */
+  const anchor =
+    findSidebarBoxByText(
+      sidebar,
+      'top rated',
+    ) ??
     findSidebarBoxByText(
       sidebar,
       'top contributors',
-    );
-
-  const findUser =
+    ) ??
     findSidebarBoxByText(
       sidebar,
       'find user',
     );
 
-  /*
-   * Preferred location:
-   *
-   * Top contributors
-   * Online Friends
-   * Find user
-   */
-  if (topContributors) {
-    topContributors.insertAdjacentElement(
-      'afterend',
-      host,
-    );
-  } else if (findUser) {
-    findUser.insertAdjacentElement(
+  if (anchor) {
+    anchor.insertAdjacentElement(
       'beforebegin',
       host,
     );
+
+    return host;
+  }
+
+  /*
+   * Fallback if the sidebar titles aren't found
+   * (Codeforces changed the markup, or the page is
+   * not in English): still keep it near the top, right
+   * after the first box, instead of at the very bottom.
+   */
+  const firstBox =
+    sidebar.querySelector(
+      '.roundbox',
+    );
+
+  if (firstBox) {
+    firstBox.insertAdjacentElement(
+      'afterend',
+      host,
+    );
   } else {
-    /*
-     * Fallback if Codeforces changes
-     * the sidebar markup.
-     */
     sidebar.appendChild(host);
   }
 

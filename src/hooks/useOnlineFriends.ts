@@ -26,7 +26,7 @@ import type {
  * codeforces.com. 60s is a middle ground: noticeably
  * live, without firing ~1 request/friend every few
  * seconds indefinitely. The panel's own refresh
- * button (top-right) still gives an instant manual
+ * button (bottom row) still gives an instant manual
  * check any time.
  */
 const REFRESH_INTERVAL_MS =
@@ -43,7 +43,6 @@ export type OnlineFriendsState =
       status: 'ready';
       friends: OnlineFriend[];
       updatedAt: number;
-      refreshing: boolean;
     }
   | {
       status: 'error';
@@ -52,6 +51,15 @@ export type OnlineFriendsState =
 
 interface Result {
   state: OnlineFriendsState;
+
+  /*
+   * True only while a refresh the user asked for
+   * (by clicking the refresh button) is running.
+   * The initial load and the 60s auto-refresh
+   * never set it, so they stay visually silent.
+   */
+  refreshing: boolean;
+
   refresh: () => void;
 }
 
@@ -63,6 +71,9 @@ export function useOnlineFriends(
       status: 'loading',
     });
 
+  const [refreshing, setRefreshing] =
+    useState(false);
+
   const [tick, setTick] =
     useState(0);
 
@@ -72,28 +83,64 @@ export function useOnlineFriends(
   stateRef.current =
     state;
 
+  /*
+   * Set by refresh() so the effect below can tell
+   * a click apart from the interval's auto tick.
+   */
+  const manualRef =
+    useRef(false);
+
   useEffect(() => {
     if (!active) {
+      /*
+       * Hidden: drop the old list so turning the
+       * box back on starts from a clean "loading"
+       * state instead of flashing stale friends.
+       */
+      setState(previous =>
+        previous.status ===
+        'loading'
+          ? previous
+          : {
+              status:
+                'loading',
+            },
+      );
+
+      setRefreshing(false);
+
       return;
     }
 
     let cancelled =
       false;
 
-    const current =
-      stateRef.current;
+    const manual =
+      manualRef.current;
 
-    setState(
-      current.status ===
-        'ready'
-        ? {
-            ...current,
-            refreshing: true,
-          }
-        : {
-            status: 'loading',
-          },
-    );
+    manualRef.current =
+      false;
+
+    /*
+     * Only a click gets visible feedback. Auto
+     * refreshes leave the current list and the
+     * refresh button exactly as they are until
+     * fresh data quietly replaces them.
+     */
+    if (manual) {
+      setRefreshing(true);
+
+      if (
+        stateRef.current
+          .status ===
+        'error'
+      ) {
+        setState({
+          status:
+            'loading',
+        });
+      }
+    }
 
     (async () => {
       try {
@@ -158,27 +205,32 @@ export function useOnlineFriends(
             ),
           updatedAt:
             Date.now(),
-          refreshing: false,
         });
       } catch {
         if (cancelled) {
           return;
         }
 
+        /*
+         * A failed refresh keeps whatever list is
+         * already on screen. The error message is
+         * only for when there is nothing to show.
+         */
         setState(
           previous =>
             previous.status ===
             'ready'
-              ? {
-                  ...previous,
-                  refreshing: false,
-                }
+              ? previous
               : {
                   status: 'error',
                   message:
                     LOAD_ERROR_MESSAGE,
                 },
         );
+      } finally {
+        if (!cancelled) {
+          setRefreshing(false);
+        }
       }
     })();
 
@@ -212,10 +264,15 @@ export function useOnlineFriends(
 
   return {
     state,
-    refresh: () =>
+    refreshing,
+    refresh: () => {
+      manualRef.current =
+        true;
+
       setTick(
         count =>
           count + 1,
-      ),
+      );
+    },
   };
 }
