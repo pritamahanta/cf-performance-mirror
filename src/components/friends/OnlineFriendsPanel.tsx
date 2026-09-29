@@ -612,8 +612,7 @@ export function OnlineFriendsPanel() {
 
       {state.status ===
         'ready' &&
-        (state.progress ||
-          state.incomplete) && (
+        state.incomplete && (
           <div
             style={{
               padding:
@@ -625,9 +624,7 @@ export function OnlineFriendsPanel() {
                 'center',
             }}
           >
-            {state.progress
-              ? `Checking\u2026 ${state.progress.checked}/${state.progress.total}`
-              : "Some friends couldn't be checked \u2014 showing their last known status."}
+            {"Some friends couldn't be checked \u2014 showing their last known status."}
           </div>
         )}
 
