@@ -393,11 +393,11 @@ function FilterMenu({ settings, theme, onChange, onOpenTopics }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 12, color: theme.text, whiteSpace: 'nowrap', flexShrink: 0 }}>Difficulty</span>
           <input className="cfpm-rating-input" type="number" min="800" max="3500" step="100" placeholder="min" value={settings.ratingMin}
-            style={{ width: 58, height: 26, padding: '0 6px', borderRadius: 4, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.inputText, fontSize: 12, fontWeight: 600, textAlign: 'center', fontFamily: 'Arial,sans-serif', outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: 58, height: 26, padding: '0 6px', borderRadius: 4, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.inputText, fontSize: 12, fontWeight: 600, textAlign: 'center', fontFamily: theme.fontFamily, outline: 'none', boxSizing: 'border-box' }}
             onClick={e => e.stopPropagation()} onChange={e => onChange({ ratingMin: e.target.value })} />
           <span style={{ color: theme.muted, fontSize: 13, flexShrink: 0 }}>—</span>
           <input className="cfpm-rating-input" type="number" min="800" max="3500" step="100" placeholder="max" value={settings.ratingMax}
-            style={{ width: 58, height: 26, padding: '0 6px', borderRadius: 4, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.inputText, fontSize: 12, fontWeight: 600, textAlign: 'center', fontFamily: 'Arial,sans-serif', outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: 58, height: 26, padding: '0 6px', borderRadius: 4, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.inputText, fontSize: 12, fontWeight: 600, textAlign: 'center', fontFamily: theme.fontFamily, outline: 'none', boxSizing: 'border-box' }}
             onClick={e => e.stopPropagation()} onChange={e => onChange({ ratingMax: e.target.value })} />
           {ratingClear && <button style={{ fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', padding: 0, outline: 'none', color: theme.accentBlue, marginLeft: 'auto' }} onClick={e => { e.stopPropagation(); onChange({ ratingMin: '', ratingMax: '' }); }}>Clear</button>}
         </div>
@@ -515,7 +515,7 @@ function TopicPicker({ theme, search, setSearch, tags, availableTags, selected, 
       <div className="cfpm-tag-search-wrap" style={{ position: 'relative', display: 'flex', alignItems: 'center', borderBottom: `1px solid ${theme.dropdownBorder}`, background: theme.dropdownSection, flexShrink: 0 }}>
         <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke={theme.muted} strokeWidth="1.6" strokeLinecap="round" style={{ position: 'absolute', left: 9, pointerEvents: 'none' }}><circle cx="6" cy="6" r="4" /><path d="M10 10l2.5 2.5" /></svg>
         <input autoFocus className="cfpm-tag-search" type="text" placeholder="Search topics…" value={search}
-          style={{ width: '100%', boxSizing: 'border-box', height: 30, padding: '0 10px 0 30px', fontSize: 12, fontFamily: 'Arial,sans-serif', outline: 'none', border: 'none', background: 'transparent', color: theme.inputText }}
+          style={{ width: '100%', boxSizing: 'border-box', height: 30, padding: '0 10px 0 30px', fontSize: 12, fontFamily: theme.fontFamily, outline: 'none', border: 'none', background: 'transparent', color: theme.inputText }}
           onChange={e => setSearch(e.target.value)}
           onClick={e => e.stopPropagation()}
           onKeyDown={e => { if (e.key === 'Escape') onEscape(); }}

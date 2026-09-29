@@ -2,6 +2,7 @@ export interface Theme {
   isDark: boolean;
   bg: string;
   text: string;
+  fontFamily: string;
   border: string;
   borderLight: string;
   borderLighter: string;
@@ -84,6 +85,23 @@ function getBorderColor(): string {
   return detectDarkMode() ? '#444' : '#d4d4d4';
 }
 
+function getFontFamily(): string {
+  for (const selector of ['.roundbox', '.info', '#pageContent']) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const fontFamily = window.getComputedStyle(element).fontFamily;
+    if (fontFamily) return fontFamily;
+  }
+  const bodyFontFamily = window.getComputedStyle(document.body).fontFamily;
+  if (bodyFontFamily) return bodyFontFamily;
+  /*
+   * Verified against a live codeforces.com page's
+   * computed body font-family - used only if every
+   * selector above comes back empty.
+   */
+  return 'Verdana, Arial, sans-serif';
+}
+
 export function createTheme(): Theme {
   const isDark = detectDarkMode();
   const active = isDark
@@ -93,7 +111,8 @@ export function createTheme(): Theme {
   return {
     isDark,
     bg: getBackground(),
-    text: isDark ? '#e8e8e8' : '#0b1220',
+    text: isDark ? '#e8e8e8' : '#000000',
+    fontFamily: getFontFamily(),
     border: getBorderColor(),
     borderLight: isDark ? '#3a3a3a' : '#e8e8e8',
     borderLighter: isDark ? '#2e2e2e' : '#f2f2f2',
@@ -102,7 +121,7 @@ export function createTheme(): Theme {
     headingText: isDark ? '#ddd' : '#222',
     tableHeaderText: isDark ? '#bbb' : '#666',
     tableCellText: isDark ? '#ccc' : '#555',
-    accentBlue: '#1652d6',
+    accentBlue: isDark ? '#1652d6' : '#0000cc',
     btnBg: isDark ? '#2e2e2e' : '#f4f4f4',
     btnText: isDark ? '#ccc' : '#444',
     btnBorder: isDark ? '#484848' : '#d0d0d0',
@@ -116,7 +135,7 @@ export function createTheme(): Theme {
     dropdownBg: isDark ? '#202020' : '#ffffff',
     dropdownBorder: isDark ? '#383838' : '#e0e0e0',
     dropdownSection: isDark ? '#1a1a1a' : '#f9f9f9',
-    problemLink: isDark ? '#7aabff' : '#1652d6',
+    problemLink: isDark ? '#7aabff' : '#0000cc',
     solvedBadge: isDark ? '#1a3320' : '#e6f4ea',
     solvedBadgeText: isDark ? '#4caf50' : '#276221',
     waBadge: isDark ? '#331a1a' : '#fdecea',

@@ -132,7 +132,7 @@ function App({
 
     host.style.cssText = [
       'box-sizing:border-box',
-      'font-family:Arial,sans-serif',
+      `font-family:${theme.fontFamily}`,
       'font-size:14px',
       `color:${theme.text}`,
       `background:${theme.bg}`,

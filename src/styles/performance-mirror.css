@@ -108,13 +108,13 @@
       .cfpm-dropdown-header {
         display: flex; align-items: center; gap: 6px;
         padding: 10px 14px; box-sizing: border-box;
-        font-family: Arial, sans-serif; font-size: 13px; font-weight: 700;
+        font-family: Verdana, Arial, sans-serif; font-size: 13px; font-weight: 700;
       }
       .cfpm-back-btn {
         display: inline-flex; align-items: center; justify-content: center;
         width: 18px; height: 18px; padding: 0; flex-shrink: 0;
         border: none; background: transparent; cursor: pointer;
-        font-size: 15px; font-family: Arial, sans-serif; line-height: 1; color: inherit;
+        font-size: 15px; font-family: Verdana, Arial, sans-serif; line-height: 1; color: inherit;
         outline: none !important; -webkit-appearance: none; appearance: none;
       }
       .cfpm-back-btn:hover { opacity: 0.7; }
@@ -206,7 +206,7 @@
     
 
 /* React structure uses the legacy visual language; these rules mirror the old inline layout. */
-#cfpm-compact { font-family: Arial, sans-serif; font-size: 14px; padding: 0; margin-top: 10px; max-width: 920px; border-radius: 5px; }
+#cfpm-compact { font-family: Verdana, Arial, sans-serif; font-size: 14px; padding: 0; margin-top: 10px; max-width: 920px; border-radius: 5px; }
 #cfpm-header-divider { height: 1px; margin: 0; }
 #cfpm-body { padding: 0 14px 14px 14px; box-sizing: border-box; }
 .cfpm-controls-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; min-height:36px; margin-top:12px; }
@@ -237,6 +237,16 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
+
+/*
+ * Long handles (Codeforces allows up to 24 characters): keep the table exactly as
+ * wide as the box, with the dot and Rating columns at their set widths, and let an
+ * over-long handle wrap onto a second line. Without this, a long handle widens the
+ * table past the box and the Rating column gets cut off. (On problem pages the
+ * handle sits inside .cfpm-friend-user, which already wraps.)
+ */
+.cfpm-friends-list table.rtable { table-layout: fixed; width: 100%; }
+.cfpm-friends-list table.rtable td:nth-child(2) > a { overflow-wrap: anywhere; }
 
 /* Fixed footer row: never scrolls with the list. */
 .cfpm-friends-footer {

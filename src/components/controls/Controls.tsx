@@ -60,7 +60,7 @@ export function Controls({
     background: theme.inputBg,
     color: theme.inputText,
     fontSize: 12,
-    fontFamily: 'Arial, sans-serif',
+    fontFamily: theme.fontFamily,
     whiteSpace: 'nowrap',
     outline: 'none',
     cursor: 'pointer',

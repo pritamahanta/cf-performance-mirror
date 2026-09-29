@@ -247,7 +247,7 @@ export function PerformanceMirror({
     boxSizing:
       'border-box',
     fontFamily:
-      'Arial, sans-serif',
+      theme.fontFamily,
     fontSize: 14,
     color:
       theme.text,
