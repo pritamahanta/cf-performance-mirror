@@ -647,6 +647,9 @@ export function OnlineFriendsPanel() {
         openedSubmissions.length >
           0 && (
           <FriendSubmissionsPopup
+            key={
+              openedFriend.handle
+            }
             title={
               <RatedHandle
                 handle={

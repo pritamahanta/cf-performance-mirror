@@ -460,7 +460,7 @@ export function FriendSubmissionsPopup({
         'border-box',
       color: theme.text,
       fontFamily:
-        'Arial, sans-serif',
+        theme.fontFamily,
     };
 
   const surfaceStyle: CSSProperties =
