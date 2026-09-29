@@ -5,44 +5,42 @@ import {
 } from 'react';
 
 import {
+  checkProfileOnlineStatus,
   fetchOnlineFriends,
-  fetchOnlineHandles,
   fetchUsersInfo,
 } from '../services/codeforcesApi';
 
 import {
-  mergeFriendsWithInfo,
-} from '../domain/friends';
+  OnlineFriendsPoller,
+} from '../services/onlinePoller';
+
+import type {
+  PollerState,
+  Progress,
+} from '../services/onlinePoller';
 
 import type {
   OnlineFriend,
 } from '../domain/friends';
 
 /*
- * Checking online status means one request per
- * friend (see fetchOnlineHandles), not one batched
- * call, so this can't be as tight as a typical
- * poll without risking heavy, sustained load on
- * codeforces.com. 60s is a middle ground: noticeably
- * live, without firing ~1 request/friend every few
- * seconds indefinitely. The panel's own refresh
- * button (bottom row) still gives an instant manual
- * check any time.
+ * The panel-facing state. "loading" and "ready" may carry
+ * `progress` while a long scan is still running, so the list can
+ * grow as results arrive instead of waiting for every friend.
  */
-const REFRESH_INTERVAL_MS =
-  60_000;
-
-const LOAD_ERROR_MESSAGE =
-  "Couldn't load your online friends. Make sure you're logged in to Codeforces.";
-
 export type OnlineFriendsState =
   | {
       status: 'loading';
+      progress: Progress | null;
     }
   | {
       status: 'ready';
       friends: OnlineFriend[];
       updatedAt: number;
+      progress: Progress | null;
+
+      /* Some friends could not be checked; they show their last known status. */
+      incomplete: boolean;
     }
   | {
       status: 'error';
@@ -55,7 +53,7 @@ interface Result {
   /*
    * True only while a refresh the user asked for
    * (by clicking the refresh button) is running.
-   * The initial load and the 60s auto-refresh
+   * The initial load and the automatic refreshes
    * never set it, so they stay visually silent.
    */
   refreshing: boolean;
@@ -63,216 +61,126 @@ interface Result {
   refresh: () => void;
 }
 
+function createPoller(): OnlineFriendsPoller {
+  return new OnlineFriendsPoller(
+    {
+      fetchFriends: fetchOnlineFriends,
+      checkProfile: checkProfileOnlineStatus,
+      fetchInfo: fetchUsersInfo,
+    },
+    {
+      isHidden: () =>
+        document.hidden,
+      subscribe: callback => {
+        document.addEventListener(
+          'visibilitychange',
+          callback,
+        );
+
+        return () => {
+          document.removeEventListener(
+            'visibilitychange',
+            callback,
+          );
+        };
+      },
+    },
+  );
+}
+
+function toPanelState(
+  state: PollerState,
+): OnlineFriendsState {
+  switch (state.status) {
+    case 'loading':
+      return {
+        status: 'loading',
+        progress:
+          state.progress,
+      };
+
+    case 'error':
+      return {
+        status: 'error',
+        message:
+          state.message,
+      };
+
+    default:
+      return {
+        status: 'ready',
+        friends:
+          state.friends,
+        updatedAt:
+          state.updatedAt,
+        progress:
+          state.progress,
+        incomplete:
+          state.incomplete,
+      };
+  }
+}
+
 export function useOnlineFriends(
   active: boolean,
 ): Result {
-  const [state, setState] =
-    useState<OnlineFriendsState>({
-      status: 'loading',
-    });
+  const pollerRef =
+    useRef<OnlineFriendsPoller | null>(
+      null,
+    );
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  if (pollerRef.current === null) {
+    pollerRef.current =
+      createPoller();
+  }
 
-  const [tick, setTick] =
-    useState(0);
+  const poller =
+    pollerRef.current;
 
-  const stateRef =
-    useRef(state);
-
-  stateRef.current =
-    state;
-
-  /*
-   * Set by refresh() so the effect below can tell
-   * a click apart from the interval's auto tick.
-   */
-  const manualRef =
-    useRef(false);
+  const [snapshot, setSnapshot] =
+    useState<PollerState>(() =>
+      poller.getState(),
+    );
 
   useEffect(() => {
     if (!active) {
-      /*
-       * Hidden: drop the old list so turning the
-       * box back on starts from a clean "loading"
-       * state instead of flashing stale friends.
-       */
-      setState(previous =>
-        previous.status ===
-        'loading'
-          ? previous
-          : {
-              status:
-                'loading',
-            },
-      );
-
-      setRefreshing(false);
-
       return;
     }
 
-    let cancelled =
-      false;
-
-    const manual =
-      manualRef.current;
-
-    manualRef.current =
-      false;
-
-    /*
-     * Only a click gets visible feedback. Auto
-     * refreshes leave the current list and the
-     * refresh button exactly as they are until
-     * fresh data quietly replaces them.
-     */
-    if (manual) {
-      setRefreshing(true);
-
-      if (
-        stateRef.current
-          .status ===
-        'error'
-      ) {
-        setState({
-          status:
-            'loading',
-        });
-      }
-    }
-
-    (async () => {
-      try {
-        /*
-         * This returns all friends from the
-         * authenticated /friends page.
-         */
-        const handles =
-          await fetchOnlineFriends();
-
-        /*
-         * This now executes user.info from
-         * the extension service worker. Used
-         * only for rating/rank display - not
-         * for online status (see below).
-         */
-        const infos =
-          handles.length > 0
-            ? await fetchUsersInfo(
-                handles,
-              )
-            : [];
-
-        /*
-         * user.info's lastOnlineTimeSeconds can
-         * lag the live site by an hour or more,
-         * so online status is instead read
-         * directly off each friend's profile
-         * page, which reflects live data.
-         */
-        const onlineHandleSet =
-          handles.length > 0
-            ? await fetchOnlineHandles(
-                handles,
-              )
-            : new Set<string>();
-
-        if (cancelled) {
-          return;
-        }
-
-        const onlineInfos =
-          infos.filter(
-            info =>
-              onlineHandleSet.has(
-                info.handle,
-              ),
-          );
-
-        const onlineHandles =
-          onlineInfos.map(
-            info =>
-              info.handle,
-          );
-
-        setState({
-          status: 'ready',
-          friends:
-            mergeFriendsWithInfo(
-              onlineHandles,
-              onlineInfos,
-            ),
-          updatedAt:
-            Date.now(),
-        });
-      } catch {
-        if (cancelled) {
-          return;
-        }
-
-        /*
-         * A failed refresh keeps whatever list is
-         * already on screen. The error message is
-         * only for when there is nothing to show.
-         */
-        setState(
-          previous =>
-            previous.status ===
-            'ready'
-              ? previous
-              : {
-                  status: 'error',
-                  message:
-                    LOAD_ERROR_MESSAGE,
-                },
+    const unsubscribe =
+      poller.subscribe(() => {
+        setSnapshot(
+          poller.getState(),
         );
-      } finally {
-        if (!cancelled) {
-          setRefreshing(false);
-        }
-      }
-    })();
+      });
+
+    poller.start();
 
     return () => {
-      cancelled = true;
-    };
-  }, [active, tick]);
+      unsubscribe();
 
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
+      /*
+       * Hidden: stop all requests and drop the old list so
+       * turning the box back on starts from a clean
+       * "loading" state instead of flashing stale friends.
+       */
+      poller.stop();
 
-    const interval =
-      window.setInterval(
-        () => {
-          setTick(
-            count =>
-              count + 1,
-          );
-        },
-        REFRESH_INTERVAL_MS,
-      );
-
-    return () => {
-      window.clearInterval(
-        interval,
+      setSnapshot(
+        poller.getState(),
       );
     };
-  }, [active]);
+  }, [active, poller]);
 
   return {
-    state,
-    refreshing,
+    state:
+      toPanelState(
+        snapshot,
+      ),
+    refreshing:
+      snapshot.refreshing,
     refresh: () => {
-      manualRef.current =
-        true;
-
-      setTick(
-        count =>
-          count + 1,
-      );
+      poller.refresh();
     },
   };
 }

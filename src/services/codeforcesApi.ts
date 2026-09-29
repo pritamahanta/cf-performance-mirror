@@ -10,6 +10,14 @@ import {
   createPacedApiClient,
 } from './pacedApi';
 
+import {
+  classifyProfileHtml,
+} from '../domain/onlineTracker';
+
+import type {
+  OnlineStatus,
+} from '../domain/onlineTracker';
+
 const API_BASE =
   'https://codeforces.com/api';
 
@@ -177,7 +185,9 @@ export async function fetchContestSubmissionsByHandle(
  * Instead, read the authenticated /friends page
  * using the user's existing Codeforces session.
  */
-export async function fetchOnlineFriends(): Promise<
+export async function fetchOnlineFriends(
+  signal?: AbortSignal,
+): Promise<
   string[]
 > {
   const response =
@@ -186,6 +196,7 @@ export async function fetchOnlineFriends(): Promise<
       {
         credentials: 'include',
         cache: 'no-store',
+        signal,
       },
     );
 
@@ -321,20 +332,97 @@ export async function fetchOnlineFriends(): Promise<
  *
  * Each profile page itself is not cached the same
  * way: it renders "Last visit: online now" (in
- * green) directly from live data. Checking that
+ * green) directly from live data, and "Last visit:
+ * 3 hours ago" for everyone else. Checking that
  * text per-friend is slower (one request per
  * friend) but is the only signal confirmed to be
  * accurate.
+ *
+ * Only a page that actually contains "Last visit:"
+ * counts as an answer. Anything else (an error
+ * status, a throttling or challenge page, a network
+ * failure) is "unknown", never "offline", so a
+ * failed check can't make someone disappear.
  */
-const PROFILE_ONLINE_PATTERN =
-  /Last visit:\s*(?:<[^>]+>\s*)*online now/i;
 
-const PROFILE_CHECK_CONCURRENCY =
-  10;
+/* The "Last visit" line sits near the top of the page; never read more than this. */
+const PROFILE_MAX_CHARS =
+  600_000;
 
-async function isProfileOnlineNow(
+/* Enough text after "Last visit:" to see whether it says "online now". */
+const PROFILE_CONTEXT_CHARS =
+  300;
+
+/*
+ * Reads the profile response only until the
+ * "Last visit" line has been seen, then cancels the
+ * rest of the download.
+ */
+async function readProfileHead(
+  response: Response,
+): Promise<string> {
+  if (!response.body) {
+    return response.text();
+  }
+
+  const reader =
+    response.body.getReader();
+
+  const decoder =
+    new TextDecoder();
+
+  let html = '';
+
+  try {
+    for (;;) {
+      const {
+        done,
+        value,
+      } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      html +=
+        decoder.decode(
+          value,
+          { stream: true },
+        );
+
+      const marker =
+        html.search(
+          /Last visit:/i,
+        );
+
+      if (
+        marker !== -1 &&
+        html.length - marker >=
+          PROFILE_CONTEXT_CHARS
+      ) {
+        break;
+      }
+
+      if (
+        html.length >
+        PROFILE_MAX_CHARS
+      ) {
+        break;
+      }
+    }
+  } finally {
+    reader
+      .cancel()
+      .catch(() => undefined);
+  }
+
+  return html;
+}
+
+export async function checkProfileOnlineStatus(
   handle: string,
-): Promise<boolean> {
+  signal?: AbortSignal,
+): Promise<OnlineStatus> {
   try {
     const response =
       await fetch(
@@ -343,68 +431,30 @@ async function isProfileOnlineNow(
         )}`,
         {
           cache: 'no-store',
+          signal,
         },
       );
 
-    if (!response.ok) {
-      return false;
+    /*
+     * A handle that no longer exists is a definite
+     * answer (not online), not a failure to retry.
+     */
+    if (response.status === 404) {
+      return 'offline';
     }
 
-    const html =
-      await response.text();
+    if (!response.ok) {
+      return 'unknown';
+    }
 
-    return PROFILE_ONLINE_PATTERN.test(
-      html,
+    return classifyProfileHtml(
+      await readProfileHead(
+        response,
+      ),
     );
   } catch {
-    return false;
+    return 'unknown';
   }
-}
-
-export async function fetchOnlineHandles(
-  handles: string[],
-): Promise<Set<string>> {
-  const online =
-    new Set<string>();
-
-  for (
-    let i = 0;
-    i < handles.length;
-    i +=
-      PROFILE_CHECK_CONCURRENCY
-  ) {
-    const batch =
-      handles.slice(
-        i,
-        i +
-          PROFILE_CHECK_CONCURRENCY,
-      );
-
-    const results =
-      await Promise.all(
-        batch.map(
-          async handle => ({
-            handle,
-            online:
-              await isProfileOnlineNow(
-                handle,
-              ),
-          }),
-        ),
-      );
-
-    results.forEach(
-      result => {
-        if (result.online) {
-          online.add(
-            result.handle,
-          );
-        }
-      },
-    );
-  }
-
-  return online;
 }
 
 type ExtensionRuntime = {
@@ -445,6 +495,10 @@ interface UserInfoResponse {
 const USER_INFO_CHUNK_SIZE =
   100;
 
+/* Slightly above the documented 2s between API calls. */
+const USER_INFO_CHUNK_GAP_MS =
+  2_100;
+
 export async function fetchUsersInfo(
   handles: string[],
 ): Promise<
@@ -474,31 +528,51 @@ export async function fetchUsersInfo(
     );
   }
 
-  const results =
-    await Promise.all(
-      chunks.map(
-        async chunk => {
-          const response =
-            (await runtime.sendMessage(
-              {
-                type:
-                  'CFPM_FETCH_USER_INFO',
-                handles:
-                  chunk,
-              },
-            )) as UserInfoResponse;
+  /*
+   * One chunk at a time: parallel chunks would be an
+   * unpaced burst against the documented limit of one
+   * API call per two seconds, and a single rejected
+   * chunk would discard all the others.
+   */
+  const results: CodeforcesUser[] =
+    [];
 
-          if (!response?.ok) {
-            throw new Error(
-              response?.error ||
-                'Could not fetch Codeforces user information.',
-            );
-          }
+  for (
+    let index = 0;
+    index < chunks.length;
+    index += 1
+  ) {
+    if (index > 0) {
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            USER_INFO_CHUNK_GAP_MS,
+          ),
+      );
+    }
 
-          return response.data ?? [];
+    const response =
+      (await runtime.sendMessage(
+        {
+          type:
+            'CFPM_FETCH_USER_INFO',
+          handles:
+            chunks[index],
         },
-      ),
-    );
+      )) as UserInfoResponse;
 
-  return results.flat();
+    if (!response?.ok) {
+      throw new Error(
+        response?.error ||
+          'Could not fetch Codeforces user information.',
+      );
+    }
+
+    results.push(
+      ...(response.data ?? []),
+    );
+  }
+
+  return results;
 }

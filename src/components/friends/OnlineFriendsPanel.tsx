@@ -398,7 +398,9 @@ export function OnlineFriendsPanel() {
               'center',
           }}
         >
-          {"Checking who's online\u2026"}
+          {state.progress
+            ? `Checking who's online\u2026 ${state.progress.checked}/${state.progress.total}`
+            : "Checking who's online\u2026"}
         </div>
       )}
 
@@ -607,6 +609,27 @@ export function OnlineFriendsPanel() {
           </table>
         </div>
       )}
+
+      {state.status ===
+        'ready' &&
+        (state.progress ||
+          state.incomplete) && (
+          <div
+            style={{
+              padding:
+                '0.25em 1em',
+              fontSize:
+                '0.85em',
+              opacity: 0.7,
+              textAlign:
+                'center',
+            }}
+          >
+            {state.progress
+              ? `Checking\u2026 ${state.progress.checked}/${state.progress.total}`
+              : "Some friends couldn't be checked \u2014 showing their last known status."}
+          </div>
+        )}
 
       <div className="cfpm-friends-footer">
         <div className="cfpm-friends-footer-group">
