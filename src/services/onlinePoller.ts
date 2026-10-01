@@ -4,6 +4,9 @@ import { OnlineTracker } from '../domain/onlineTracker';
 import { ONLINE_TTL_MS, type OnlineStatus } from '../domain/onlineTracker';
 import type { Persistence, PersistedSnapshot } from './onlineStore';
 import { checkHandles } from './onlinePool';
+import type { PoolSummary } from './onlinePool';
+import { createTokenBucket } from './rateLimiter';
+import type { RateLimiter } from './rateLimiter';
 
 export interface Progress {
   checked: number;
@@ -84,6 +87,19 @@ export interface PollerConfig {
 
   maxConcurrency: number;
 
+  /*
+   * Hard cap on profile requests: sustained rate and burst size.
+   * 0 (or less) turns the cap off.
+   */
+  requestsPerSecond: number;
+  requestBurst: number;
+
+  /* During a long full scan, friends shown online are re-checked this often. */
+  recheckOnlineEveryMs: number;
+
+  /* Above this many friends a manual refresh only re-checks who is shown online. */
+  manualFullScanMaxFriends: number;
+
   /* Pool tuning: pause after 3 failures in a row, doubling up to the max... */
   poolBaseBackoffMs: number;
   poolMaxBackoffMs: number;
@@ -107,7 +123,11 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   persistSaveGapMs: 2_000,
   resumeMinGapMs: 5_000,
   lockRetryMs: 15_000,
-  maxConcurrency: 6,
+  maxConcurrency: 3,
+  requestsPerSecond: 2,
+  requestBurst: 20,
+  recheckOnlineEveryMs: 90_000,
+  manualFullScanMaxFriends: 150,
   poolBaseBackoffMs: 1_500,
   poolMaxBackoffMs: 20_000,
   poolBreakerLimit: 15,
@@ -165,6 +185,7 @@ export class OnlineFriendsPoller {
   private readonly config: PollerConfig;
   private readonly visibility: Visibility;
   private readonly persistence: Persistence | null;
+  private readonly limiter: RateLimiter | null;
   private readonly listeners = new Set<() => void>();
 
   private tracker = new OnlineTracker();
@@ -225,6 +246,15 @@ export class OnlineFriendsPoller {
     this.visibility = visibility;
     this.persistence = persistence;
     this.config = { ...DEFAULT_POLLER_CONFIG, ...config };
+
+    /* One bucket for the poller's whole life: toggling the panel must not refill it. */
+    this.limiter =
+      this.config.requestsPerSecond > 0
+        ? createTokenBucket({
+            capacity: Math.max(1, this.config.requestBurst),
+            refillPerSec: this.config.requestsPerSecond,
+          })
+        : null;
   }
 
   getState(): PollerState {
@@ -484,7 +514,21 @@ export class OnlineFriendsPoller {
   }
 
   private chooseMode(manual: boolean): 'full' | 'quick' | 'none' {
-    if (manual || this.isFullScanDue()) {
+    if (manual) {
+      /*
+       * A full scan of a big list takes minutes, so the refresh button
+       * must not start one: it re-checks who is shown online instead.
+       */
+      if (this.tracker.friendCount() <= this.config.manualFullScanMaxFriends) {
+        return 'full';
+      }
+
+      if (this.tracker.onlineHandles().length > 0) {
+        return 'quick';
+      }
+    }
+
+    if (this.isFullScanDue()) {
       return 'full';
     }
 
@@ -582,7 +626,7 @@ export class OnlineFriendsPoller {
           return;
         }
 
-        await this.runCycle('quick', false);
+        await this.runCycle('quick', manual);
       }).then(
         ran => {
           if (epoch !== this.epoch) {
@@ -623,7 +667,7 @@ export class OnlineFriendsPoller {
       return;
     }
 
-    void this.runCycle('quick', false);
+    void this.runCycle('quick', manual);
   }
 
   private persist(force: boolean): void {
@@ -670,6 +714,11 @@ export class OnlineFriendsPoller {
     this.refreshing = manual || this.manualQueued;
     this.progress = null;
 
+    if (this.refreshing) {
+      /* Show the refresh feedback right away, not with the first result. */
+      this.emit();
+    }
+
     if (mode === 'full') {
       this.fullScanOpen = true;
       this.fullScanStartedAt = startedAt;
@@ -699,25 +748,103 @@ export class OnlineFriendsPoller {
 
       let checked = 0;
 
-      const summary = await checkHandles(handles, {
-        signal,
-        maxConcurrency: this.config.maxConcurrency,
-        baseBackoffMs: this.config.poolBaseBackoffMs,
-        maxBackoffMs: this.config.poolMaxBackoffMs,
-        breakerLimit: this.config.poolBreakerLimit,
-        check: this.api.checkProfile,
-        onResult: (handle, status) => {
-          tracker.record(handle, status, Date.now());
-          checked += 1;
-          this.dirty = true;
+      const runChecks = (batch: string[], countProgress: boolean): Promise<PoolSummary> =>
+        checkHandles(batch, {
+          signal,
+          maxConcurrency: this.config.maxConcurrency,
+          baseBackoffMs: this.config.poolBaseBackoffMs,
+          maxBackoffMs: this.config.poolMaxBackoffMs,
+          breakerLimit: this.config.poolBreakerLimit,
+          limiter: this.limiter,
+          check: this.api.checkProfile,
+          onResult: (handle, status) => {
+            tracker.record(handle, status, Date.now());
+            this.dirty = true;
 
-          if (Date.now() - startedAt > this.config.progressAfterMs) {
-            this.progress = { checked, total: handles.length };
+            if (countProgress) {
+              checked += 1;
+
+              if (Date.now() - startedAt > this.config.progressAfterMs) {
+                this.progress = { checked, total: handles.length };
+              }
+            }
+
+            this.scheduleFlush(epoch, tracker);
+          },
+        });
+
+      let summary: PoolSummary;
+
+      if (mode === 'full') {
+        /*
+         * A full scan can take minutes and no quick cycle can run during
+         * it, so the scan checks friends in slices and re-checks the ones
+         * shown online between slices. Otherwise they would expire from
+         * the list (ONLINE_TTL_MS) in the middle of a long scan.
+         */
+        const onlineKeys = new Set(tracker.onlineHandles().map(handle => handle.toLowerCase()));
+        const head = handles.filter(handle => onlineKeys.has(handle.toLowerCase()));
+        const rest = handles.filter(handle => !onlineKeys.has(handle.toLowerCase()));
+        const { requestsPerSecond, recheckOnlineEveryMs } = this.config;
+
+        const sliceSize =
+          requestsPerSecond > 0
+            ? Math.max(20, Math.floor((recheckOnlineEveryMs / 1000) * requestsPerSecond))
+            : 200;
+
+        const combined: PoolSummary = {
+          total: 0,
+          done: 0,
+          unknown: 0,
+          aborted: false,
+          brokeCircuit: false,
+        };
+
+        /* Re-checks only feed the list; they never count toward progress or "incomplete". */
+        const merge = (part: PoolSummary, main: boolean) => {
+          if (main) {
+            combined.total += part.total;
+            combined.done += part.done;
+            combined.unknown += part.unknown;
           }
 
-          this.scheduleFlush(epoch, tracker);
-        },
-      });
+          combined.aborted = combined.aborted || part.aborted;
+          combined.brokeCircuit = combined.brokeCircuit || part.brokeCircuit;
+        };
+
+        let lastOnlineCheckAt = Date.now();
+
+        if (head.length > 0) {
+          merge(await runChecks(head, true), true);
+          lastOnlineCheckAt = Date.now();
+        }
+
+        for (let i = 0; i < rest.length; i += sliceSize) {
+          if (signal.aborted || combined.brokeCircuit) {
+            break;
+          }
+
+          if (Date.now() - lastOnlineCheckAt >= recheckOnlineEveryMs) {
+            const online = tracker.onlineHandles();
+
+            if (online.length > 0) {
+              merge(await runChecks(online, false), false);
+
+              if (signal.aborted || combined.brokeCircuit) {
+                break;
+              }
+            }
+
+            lastOnlineCheckAt = Date.now();
+          }
+
+          merge(await runChecks(rest.slice(i, i + sliceSize), true), true);
+        }
+
+        summary = combined;
+      } else {
+        summary = await runChecks(handles, true);
+      }
 
       if (signal.aborted) {
         return;

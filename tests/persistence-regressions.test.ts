@@ -43,7 +43,7 @@ function fakeApi(friends: string[], onlineSet: Set<string>, friendsDelay = 0) {
   return { api, calls };
 }
 
-const FAST = { intervalMs: 60, lockRetryMs: 40, flushMs: 10, infoGapMs: 5, progressAfterMs: 5000, minManualGapMs: 1, persistSaveGapMs: 10 };
+const FAST = { requestsPerSecond: 0, intervalMs: 60, lockRetryMs: 40, flushMs: 10, infoGapMs: 5, progressAfterMs: 5000, minManualGapMs: 1, persistSaveGapMs: 10 };
 
 test('lock lost: tab that loses the lock must resume once the lock is free', async () => {
   const lock = { held: true };

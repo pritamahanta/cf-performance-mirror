@@ -28,6 +28,7 @@ function fakeVisibility() {
 }
 
 const FAST = {
+  requestsPerSecond: 0,
   intervalMs: 60,
   maxBackoffMs: 300,
   progressAfterMs: 20,

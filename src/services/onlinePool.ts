@@ -1,4 +1,5 @@
 import type { OnlineStatus } from '../domain/onlineTracker';
+import type { RateLimiter } from './rateLimiter';
 
 export interface PoolOptions {
   /* Checks one friend. Must resolve "unknown" (not throw) on any failure. */
@@ -20,6 +21,12 @@ export interface PoolOptions {
 
   baseBackoffMs?: number;
   maxBackoffMs?: number;
+
+  /*
+   * Caps how fast requests may start. Every network attempt, retries
+   * included, takes one token. Omit for no cap.
+   */
+  limiter?: RateLimiter | null;
 }
 
 export interface PoolSummary {
@@ -70,6 +77,7 @@ export function checkHandles(
     breakerLimit = 15,
     baseBackoffMs = 1_500,
     maxBackoffMs = 20_000,
+    limiter = null,
   } = options;
 
   return new Promise(resolve => {
@@ -146,6 +154,24 @@ export function checkHandles(
       }
 
       while (running < limit && queue.length > 0) {
+        if (limiter) {
+          const rateWait = limiter.take();
+
+          if (rateWait > 0) {
+            /* Out of tokens: come back when one is due. One timer, ever. */
+            if (timer !== null) {
+              clearTimeout(timer);
+            }
+
+            timer = setTimeout(() => {
+              timer = null;
+              pump();
+            }, rateWait);
+
+            return;
+          }
+        }
+
         start(queue.shift() as Item);
       }
 

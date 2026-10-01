@@ -227,6 +227,11 @@ export class OnlineTracker {
     return true;
   }
 
+  /* How many friends are currently known. */
+  friendCount(): number {
+    return this.names.size;
+  }
+
   beginCycle(): void {
     this.cycle += 1;
   }
