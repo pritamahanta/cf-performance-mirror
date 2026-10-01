@@ -13,6 +13,9 @@ import {
 import {
   OnlineFriendsPoller,
 } from '../services/onlinePoller';
+import {
+  createBrowserPersistence,
+} from '../services/onlineStore';
 
 import type {
   PollerState,
@@ -85,6 +88,8 @@ function createPoller(): OnlineFriendsPoller {
         };
       },
     },
+    {},
+    createBrowserPersistence(),
   );
 }
 

@@ -1,7 +1,8 @@
 import type { CodeforcesUser } from '../types/codeforces';
 import type { OnlineFriend } from '../domain/friends';
 import { OnlineTracker } from '../domain/onlineTracker';
-import type { OnlineStatus } from '../domain/onlineTracker';
+import { ONLINE_TTL_MS, type OnlineStatus } from '../domain/onlineTracker';
+import type { Persistence, PersistedSnapshot } from './onlineStore';
 import { checkHandles } from './onlinePool';
 
 export interface Progress {
@@ -72,6 +73,15 @@ export interface PollerConfig {
   /* Ignore manual refreshes this soon after a cycle started. */
   minManualGapMs: number;
 
+  /* How long to wait before persisting a snapshot again. */
+  persistSaveGapMs: number;
+
+  /* If a full scan was interrupted, avoid repeating it for this long. */
+  resumeMinGapMs: number;
+
+  /* Retry after a storage lock is held elsewhere. */
+  lockRetryMs: number;
+
   maxConcurrency: number;
 
   /* Pool tuning: pause after 3 failures in a row, doubling up to the max... */
@@ -94,6 +104,9 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   flushMs: 300,
   infoGapMs: 2_100,
   minManualGapMs: 5_000,
+  persistSaveGapMs: 2_000,
+  resumeMinGapMs: 5_000,
+  lockRetryMs: 15_000,
   maxConcurrency: 6,
   poolBaseBackoffMs: 1_500,
   poolMaxBackoffMs: 20_000,
@@ -151,6 +164,7 @@ export class OnlineFriendsPoller {
   private readonly api: PollerApi;
   private readonly config: PollerConfig;
   private readonly visibility: Visibility;
+  private readonly persistence: Persistence | null;
   private readonly listeners = new Set<() => void>();
 
   private tracker = new OnlineTracker();
@@ -165,14 +179,23 @@ export class OnlineFriendsPoller {
   private controller: AbortController | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribeVisibility: (() => void) | null = null;
+  private unsubscribeStorage: (() => void) | null = null;
 
   private inFlight = false;
+  private acquiring = false;
   private restartRequested = false;
   private abortedForHidden = false;
   private waitingForVisible = false;
   private hiddenSince = 0;
   private currentMode: 'full' | 'quick' = 'full';
   private manualQueued = false;
+
+  private fullScanStartedAt = 0;
+  private fullScanOpen = false;
+  private interruptedPending = false;
+  private resumeNotBefore = 0;
+  private lastPersistAt = 0;
+  private lastAdoptedSavedAt = 0;
 
   private hasData = false;
   private errorMessage: string | null = null;
@@ -196,9 +219,11 @@ export class OnlineFriendsPoller {
     api: PollerApi,
     visibility: Visibility,
     config: Partial<PollerConfig> = {},
+    persistence: Persistence | null = null,
   ) {
     this.api = api;
     this.visibility = visibility;
+    this.persistence = persistence;
     this.config = { ...DEFAULT_POLLER_CONFIG, ...config };
   }
 
@@ -226,6 +251,47 @@ export class OnlineFriendsPoller {
       this.handleVisibilityChange();
     });
 
+    if (this.persistence) {
+      this.unsubscribeStorage = this.persistence.onExternalChange(() => {
+        this.adoptExternal();
+      });
+    }
+
+    if (this.persistence) {
+      const snap = this.persistence.load();
+      if (snap && this.tracker.importState(snap.tracker)) {
+        this.updatedAt = snap.updatedAt;
+        this.incomplete = snap.incomplete;
+        this.lastCycleEndedAt = snap.lastCycleEndedAt;
+        this.lastFullEndedAt = snap.lastFullEndedAt;
+        this.lastFullDurationMs = snap.lastFullDurationMs;
+        this.hasData = Date.now() - snap.updatedAt <= ONLINE_TTL_MS;
+        this.cycleStartedAt = snap.lastCycleEndedAt;
+
+        if (snap.fullScanOpen) {
+          this.interruptedPending = true;
+          const ran = Math.max(0, snap.savedAt - snap.fullScanStartedAt);
+          this.resumeNotBefore = snap.savedAt + Math.min(
+            this.config.maxFullScanGapMs,
+            Math.max(this.config.resumeMinGapMs, this.config.fullScanGapFactor * ran),
+          );
+        } else {
+          this.interruptedPending = false;
+        }
+
+        this.emit();
+
+        const remaining = this.lastCycleEndedAt > 0
+          ? Math.max(0, this.config.intervalMs - (Date.now() - this.lastCycleEndedAt))
+          : 0;
+
+        if (this.hasData && this.lastCycleEndedAt > 0 && remaining > 0) {
+          this.scheduleNext(remaining);
+          return;
+        }
+      }
+    }
+
     this.tick(false);
   }
 
@@ -245,14 +311,23 @@ export class OnlineFriendsPoller {
 
     this.unsubscribeVisibility?.();
     this.unsubscribeVisibility = null;
+    this.unsubscribeStorage?.();
+    this.unsubscribeStorage = null;
 
     this.tracker = new OnlineTracker();
     this.inFlight = false;
+    this.acquiring = false;
     this.restartRequested = false;
     this.abortedForHidden = false;
     this.waitingForVisible = false;
     this.hiddenSince = 0;
     this.manualQueued = false;
+    this.fullScanStartedAt = 0;
+    this.fullScanOpen = false;
+    this.interruptedPending = false;
+    this.resumeNotBefore = 0;
+    this.lastPersistAt = 0;
+    this.lastAdoptedSavedAt = 0;
     this.hasData = false;
     this.errorMessage = null;
     this.updatedAt = 0;
@@ -386,6 +461,10 @@ export class OnlineFriendsPoller {
   }
 
   private isFullScanDue(): boolean {
+    if (this.interruptedPending) {
+      return Date.now() >= this.resumeNotBefore;
+    }
+
     if (this.lastFullEndedAt === 0) {
       return true;
     }
@@ -403,8 +482,56 @@ export class OnlineFriendsPoller {
     return Date.now() - this.lastFullEndedAt >= gap - slack;
   }
 
+  private chooseMode(manual: boolean): 'full' | 'quick' | 'none' {
+    if (manual || this.isFullScanDue()) {
+      return 'full';
+    }
+
+    if (this.tracker.onlineHandles().length === 0) {
+      return 'none';
+    }
+
+    return 'quick';
+  }
+
+  private msUntilNextCycle(): number {
+    if (this.lastCycleEndedAt === 0) {
+      return 0;
+    }
+
+    return Math.max(0, this.config.intervalMs - (Date.now() - this.lastCycleEndedAt));
+  }
+
+  private adoptExternal(): void {
+    if (!this.running || this.inFlight || this.acquiring || !this.persistence) {
+      return;
+    }
+
+    const snap = this.persistence.load();
+    if (!snap || snap.savedAt <= this.lastAdoptedSavedAt) {
+      return;
+    }
+
+    const candidate = new OnlineTracker();
+    if (!candidate.importState(snap.tracker)) {
+      return;
+    }
+
+    this.tracker = candidate;
+    this.updatedAt = snap.updatedAt;
+    this.incomplete = snap.incomplete;
+    this.lastCycleEndedAt = snap.lastCycleEndedAt;
+    this.lastFullEndedAt = snap.lastFullEndedAt;
+    this.lastFullDurationMs = snap.lastFullDurationMs;
+    this.lastAdoptedSavedAt = snap.savedAt;
+    this.hasData = true;
+
+    this.emit();
+    this.scheduleNext(this.msUntilNextCycle());
+  }
+
   private tick(manual: boolean): void {
-    if (!this.running || this.inFlight) {
+    if (!this.running || this.inFlight || this.acquiring) {
       return;
     }
 
@@ -414,19 +541,99 @@ export class OnlineFriendsPoller {
       return;
     }
 
-    if (manual || this.isFullScanDue()) {
-      void this.runCycle('full', manual);
+    if (this.persistence?.runExclusive) {
+      const epoch = this.epoch;
+      this.acquiring = true;
+
+      void this.persistence.runExclusive(async () => {
+        this.acquiring = false;
+
+        if (epoch !== this.epoch || !this.running) {
+          return;
+        }
+
+        const snap = this.persistence?.load();
+        if (snap && snap.savedAt > this.lastAdoptedSavedAt) {
+          const candidate = new OnlineTracker();
+          if (candidate.importState(snap.tracker)) {
+            this.tracker = candidate;
+            this.updatedAt = snap.updatedAt;
+            this.incomplete = snap.incomplete;
+            this.lastCycleEndedAt = snap.lastCycleEndedAt;
+            this.lastFullEndedAt = snap.lastFullEndedAt;
+            this.lastFullDurationMs = snap.lastFullDurationMs;
+            this.lastAdoptedSavedAt = snap.savedAt;
+            this.hasData = true;
+            this.emit();
+            this.scheduleNext(this.msUntilNextCycle());
+            return;
+          }
+        }
+
+        const mode = this.chooseMode(manual);
+        if (mode === 'none' || (!manual && this.msUntilNextCycle() > 0 && this.tracker.onlineHandles().length === 0)) {
+          this.scheduleNext(this.msUntilNextCycle());
+          return;
+        }
+
+        if (mode === 'full') {
+          await this.runCycle('full', manual);
+          return;
+        }
+
+        await this.runCycle('quick', false);
+      }).then(ran => {
+        if (!ran && epoch === this.epoch && this.running && !this.inFlight) {
+          const jitter = this.config.lockRetryMs * (0.8 + Math.random() * 0.4);
+          this.scheduleNext(jitter);
+        }
+      });
 
       return;
     }
 
-    if (this.tracker.onlineHandles().length === 0) {
+    const mode = this.chooseMode(manual);
+    if (mode === 'none') {
       this.scheduleNext(this.nextDelay());
+      return;
+    }
 
+    if (mode === 'full') {
+      void this.runCycle('full', manual);
       return;
     }
 
     void this.runCycle('quick', false);
+  }
+
+  private persist(force: boolean): void {
+    if (this.persistence === null || !this.running) {
+      return;
+    }
+
+    if (!force && Date.now() - this.lastPersistAt < this.config.persistSaveGapMs) {
+      return;
+    }
+
+    if (!this.hasData && this.tracker.exportState().friends.length === 0) {
+      return;
+    }
+
+    const snapshot: PersistedSnapshot = {
+      v: 1,
+      savedAt: Math.max(Date.now(), this.lastPersistAt + 1),
+      tracker: this.tracker.exportState(),
+      updatedAt: this.updatedAt,
+      incomplete: this.incomplete,
+      lastCycleEndedAt: this.lastCycleEndedAt,
+      lastFullEndedAt: this.lastFullEndedAt,
+      lastFullDurationMs: this.lastFullDurationMs,
+      fullScanStartedAt: this.fullScanStartedAt,
+      fullScanOpen: this.fullScanOpen,
+    };
+
+    this.persistence.save(snapshot);
+    this.lastPersistAt = snapshot.savedAt;
   }
 
   private async runCycle(mode: 'full' | 'quick', manual: boolean): Promise<void> {
@@ -442,6 +649,14 @@ export class OnlineFriendsPoller {
     this.cycleStartedAt = startedAt;
     this.refreshing = manual || this.manualQueued;
     this.progress = null;
+
+    if (mode === 'full') {
+      this.fullScanOpen = true;
+      this.fullScanStartedAt = startedAt;
+      this.interruptedPending = false;
+      this.persist(true);
+    }
+
     tracker.beginCycle();
 
     let failed = false;
@@ -559,11 +774,22 @@ export class OnlineFriendsPoller {
       if (mode === 'full') {
         this.lastFullEndedAt = this.lastCycleEndedAt;
         this.lastFullDurationMs = this.lastCycleEndedAt - startedAt;
+        this.fullScanOpen = false;
+        this.interruptedPending = false;
       }
+    } else if (mode === 'full') {
+      this.interruptedPending = true;
+      const elapsed = Math.max(0, Date.now() - startedAt);
+      this.resumeNotBefore = Date.now() + Math.min(
+        this.config.maxFullScanGapMs,
+        Math.max(this.config.resumeMinGapMs, this.config.fullScanGapFactor * elapsed),
+      );
+      this.fullScanOpen = true;
     }
 
     this.dirty = false;
     this.emit();
+    this.persist(!aborted);
 
     if (!this.running) {
       return;
@@ -609,6 +835,7 @@ export class OnlineFriendsPoller {
 
       this.dirty = false;
       this.emit();
+      this.persist(false);
       void this.pumpInfo(epoch, tracker, this.controller?.signal);
     }, this.config.flushMs);
   }

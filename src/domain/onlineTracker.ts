@@ -54,13 +54,178 @@ interface InfoAttempt {
   cycle: number;
 }
 
+export interface InfoSummary {
+  handle: string;
+  rating?: number;
+  rank?: string;
+}
+
+export interface TrackerState {
+  friends: string[];
+  entries: Array<[string, 0 | 1, number]>;
+  infos: InfoSummary[];
+  order: string[];
+}
+
 export class OnlineTracker {
   private entries = new Map<string, Entry>();
-  private infos = new Map<string, CodeforcesUser>();
+  private infos = new Map<string, InfoSummary>();
   private attempts = new Map<string, InfoAttempt>();
   private names = new Map<string, string>();
   private order: string[] = [];
   private cycle = 0;
+
+  exportState(): TrackerState {
+    return {
+      friends: Array.from(this.names.values()),
+      entries: Array.from(this.entries.entries()).map(([key, entry]) => [
+        key,
+        entry.online ? 1 : 0,
+        entry.checkedAt,
+      ]),
+      infos: Array.from(this.infos.values()).map(info => ({
+        handle: info.handle,
+        rating: info.rating,
+        rank: info.rank,
+      })),
+      order: [...this.order],
+    };
+  }
+
+  importState(state: unknown): boolean {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+      return false;
+    }
+
+    const candidate = state as Record<string, unknown>;
+    const friends = candidate.friends;
+    const entries = candidate.entries;
+    const infos = candidate.infos;
+    const order = candidate.order;
+
+    if (!Array.isArray(friends) || !Array.isArray(entries) || !Array.isArray(infos) || !Array.isArray(order)) {
+      return false;
+    }
+
+    const nextNames = new Map<string, string>();
+    const seenHandles = new Set<string>();
+
+    for (const handle of friends) {
+      if (typeof handle !== 'string' || handle.length === 0 || handle.length > 64) {
+        return false;
+      }
+
+      const key = handle.toLowerCase();
+      if (seenHandles.has(key)) {
+        return false;
+      }
+
+      seenHandles.add(key);
+      nextNames.set(key, handle);
+    }
+
+    if (nextNames.size > 20_000) {
+      return false;
+    }
+
+    const nextEntries = new Map<string, Entry>();
+    const allowed = new Set(nextNames.keys());
+
+    for (const entry of entries) {
+      if (!Array.isArray(entry) || entry.length !== 3) {
+        return false;
+      }
+
+      const [handle, online, checkedAt] = entry as [unknown, unknown, unknown];
+      if (typeof handle !== 'string' || handle.length === 0 || handle.length > 64) {
+        return false;
+      }
+
+      if (online !== 0 && online !== 1) {
+        return false;
+      }
+
+      if (typeof checkedAt !== 'number' || !Number.isFinite(checkedAt)) {
+        return false;
+      }
+
+      const key = handle.toLowerCase();
+      if (!allowed.has(key)) {
+        return false;
+      }
+
+      nextEntries.set(key, {
+        online: online === 1,
+        checkedAt,
+      });
+    }
+
+    const nextInfos = new Map<string, InfoSummary>();
+    const seenInfoKeys = new Set<string>();
+
+    for (const info of infos) {
+      if (!info || typeof info !== 'object' || Array.isArray(info)) {
+        return false;
+      }
+
+      const record = info as Record<string, unknown>;
+      const handle = record.handle;
+      if (typeof handle !== 'string' || handle.length === 0 || handle.length > 64) {
+        return false;
+      }
+
+      const key = handle.toLowerCase();
+      if (!allowed.has(key) || seenInfoKeys.has(key)) {
+        return false;
+      }
+
+      const rating = record.rating;
+      const rank = record.rank;
+      if (rating !== undefined && (typeof rating !== 'number' || !Number.isFinite(rating))) {
+        return false;
+      }
+
+      if (rank !== undefined && (typeof rank !== 'string' || rank.length > 64)) {
+        return false;
+      }
+
+      seenInfoKeys.add(key);
+      nextInfos.set(key, {
+        handle: nextNames.get(key) ?? handle,
+        rating: typeof rating === 'number' ? rating : undefined,
+        rank: typeof rank === 'string' ? rank : undefined,
+      });
+    }
+
+    const nextOrder: string[] = [];
+    const seenOrder = new Set<string>();
+
+    for (const key of order) {
+      if (typeof key !== 'string' || key.length === 0 || key.length > 64) {
+        return false;
+      }
+
+      const lower = key.toLowerCase();
+      if (!allowed.has(lower) || seenOrder.has(lower)) {
+        return false;
+      }
+
+      seenOrder.add(lower);
+      nextOrder.push(lower);
+    }
+
+    const previousAttempts = this.attempts;
+    const previousCycle = this.cycle;
+
+    this.names = nextNames;
+    this.entries = nextEntries;
+    this.infos = nextInfos;
+    this.order = nextOrder;
+    this.attempts.clear();
+    this.cycle = previousCycle;
+
+    return true;
+  }
 
   beginCycle(): void {
     this.cycle += 1;

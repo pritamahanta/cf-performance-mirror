@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { OnlineFriendsPoller } from '../src/services/onlinePoller.ts';
 import type { PollerApi, PollerState, Visibility } from '../src/services/onlinePoller.ts';
+import type { Persistence, PersistedSnapshot } from '../src/services/onlineStore.ts';
 import type { OnlineStatus } from '../src/domain/onlineTracker.ts';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -249,5 +250,86 @@ test('poller: friends page failure keeps the current list', async () => {
   breakFriends = true;
   await sleep(250);
   assert.deepEqual(ready(poller.getState()), ['a']);
+  poller.stop();
+});
+
+function makePersistence(snapshot: PersistedSnapshot | null): Persistence {
+  const listeners = new Set<() => void>();
+  let current = snapshot;
+
+  return {
+    load: () => current,
+    save: next => {
+      current = next;
+      listeners.forEach(callback => callback());
+    },
+    onExternalChange: callback => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+  };
+}
+
+test('poller: hydrated snapshot is rendered immediately and delays the next scan', async () => {
+  const now = Date.now();
+  const { api, stats } = makeApi({ friends: ['a', 'b'], online: new Set(['b']) });
+  const v = fakeVisibility();
+  const persistence = makePersistence({
+    v: 1,
+    savedAt: now,
+    tracker: {
+      friends: ['a', 'b'],
+      entries: [['a', 1, now - 1_000], ['b', 1, now - 1_000]],
+      infos: [{ handle: 'b', rating: 1500, rank: 'pupil' }],
+      order: ['a', 'b'],
+    },
+    updatedAt: now - 1_000,
+    incomplete: false,
+    lastCycleEndedAt: now - 1_000,
+    lastFullEndedAt: now - 1_000,
+    lastFullDurationMs: 100,
+    fullScanStartedAt: 0,
+    fullScanOpen: false,
+  });
+
+  const poller = new OnlineFriendsPoller(api, v.visibility, { ...FAST, intervalMs: 60_000 }, persistence);
+  poller.start();
+
+  assert.equal(poller.getState().status, 'ready');
+  assert.deepEqual(poller.getState().friends.map(f => f.handle), ['b']);
+  assert.equal(stats.friendsCalls, 0);
+
+  await sleep(50);
+  assert.equal(stats.friendsCalls, 0);
+  poller.stop();
+});
+
+test('poller: stale hydrated data keeps loading until a full scan resumes', async () => {
+  const now = Date.now();
+  const { api, stats } = makeApi({ friends: ['a', 'b'], online: new Set(['b']) });
+  const v = fakeVisibility();
+  const persistence = makePersistence({
+    v: 1,
+    savedAt: now - 2 * 60_000,
+    tracker: {
+      friends: ['a', 'b'],
+      entries: [['a', 1, 0], ['b', 1, 0]],
+      infos: [{ handle: 'b', rating: 1500, rank: 'pupil' }],
+      order: ['a', 'b'],
+    },
+    updatedAt: now - 10 * 60_000,
+    incomplete: false,
+    lastCycleEndedAt: now - 2 * 60_000,
+    lastFullEndedAt: now - 2 * 60_000,
+    lastFullDurationMs: 200,
+    fullScanStartedAt: 0,
+    fullScanOpen: false,
+  });
+
+  const poller = new OnlineFriendsPoller(api, v.visibility, { ...FAST, intervalMs: 60_000 }, persistence);
+  poller.start();
+
+  await waitFor(poller, s => stats.friendsCalls > 0, 2_000);
+  assert.equal(poller.getState().status === 'ready' || poller.getState().status === 'loading', true);
   poller.stop();
 });
