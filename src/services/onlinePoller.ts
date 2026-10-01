@@ -267,6 +267,7 @@ export class OnlineFriendsPoller {
         this.lastFullDurationMs = snap.lastFullDurationMs;
         this.hasData = Date.now() - snap.updatedAt <= ONLINE_TTL_MS;
         this.cycleStartedAt = snap.lastCycleEndedAt;
+        this.lastAdoptedSavedAt = snap.savedAt;
 
         if (snap.fullScanOpen) {
           this.interruptedPending = true;
@@ -524,7 +525,7 @@ export class OnlineFriendsPoller {
     this.lastFullEndedAt = snap.lastFullEndedAt;
     this.lastFullDurationMs = snap.lastFullDurationMs;
     this.lastAdoptedSavedAt = snap.savedAt;
-    this.hasData = true;
+    this.hasData = Date.now() - snap.updatedAt <= ONLINE_TTL_MS;
 
     this.emit();
     this.scheduleNext(this.msUntilNextCycle());
@@ -563,7 +564,7 @@ export class OnlineFriendsPoller {
             this.lastFullEndedAt = snap.lastFullEndedAt;
             this.lastFullDurationMs = snap.lastFullDurationMs;
             this.lastAdoptedSavedAt = snap.savedAt;
-            this.hasData = true;
+            this.hasData = Date.now() - snap.updatedAt <= ONLINE_TTL_MS;
             this.emit();
             this.scheduleNext(this.msUntilNextCycle());
             return;
@@ -571,8 +572,8 @@ export class OnlineFriendsPoller {
         }
 
         const mode = this.chooseMode(manual);
-        if (mode === 'none' || (!manual && this.msUntilNextCycle() > 0 && this.tracker.onlineHandles().length === 0)) {
-          this.scheduleNext(this.msUntilNextCycle());
+        if (mode === 'none') {
+          this.scheduleNext(this.nextDelay());
           return;
         }
 
@@ -582,12 +583,31 @@ export class OnlineFriendsPoller {
         }
 
         await this.runCycle('quick', false);
-      }).then(ran => {
-        if (!ran && epoch === this.epoch && this.running && !this.inFlight) {
-          const jitter = this.config.lockRetryMs * (0.8 + Math.random() * 0.4);
-          this.scheduleNext(jitter);
-        }
-      });
+      }).then(
+        ran => {
+          if (epoch !== this.epoch) {
+            return;
+          }
+
+          this.acquiring = false;
+
+          if (!ran && this.running && !this.inFlight) {
+            const jitter = this.config.lockRetryMs * (0.8 + Math.random() * 0.4);
+            this.scheduleNext(jitter);
+          }
+        },
+        () => {
+          if (epoch !== this.epoch) {
+            return;
+          }
+
+          this.acquiring = false;
+
+          if (this.running && !this.inFlight) {
+            this.scheduleNext(this.nextDelay());
+          }
+        },
+      );
 
       return;
     }

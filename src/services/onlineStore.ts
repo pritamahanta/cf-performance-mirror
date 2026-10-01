@@ -191,11 +191,17 @@ export function getLoggedInHandle(doc: Document | null = typeof document !== 'un
 }
 
 function removeStorageKeys(storage: Storage, prefix: string, keep?: string): void {
+  const doomed: string[] = [];
+
   for (let i = 0; i < storage.length; i += 1) {
     const key = storage.key(i);
-    if (!key || !key.startsWith(prefix) || (keep !== undefined && key === keep)) {
-      continue;
+
+    if (key && key.startsWith(prefix) && key !== keep) {
+      doomed.push(key);
     }
+  }
+
+  for (const key of doomed) {
     try {
       storage.removeItem(key);
     } catch {
