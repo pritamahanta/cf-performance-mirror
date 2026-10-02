@@ -332,18 +332,6 @@ export function OnlineFriendsPanel() {
         )
       : [];
 
-  /*
-   * A click while a load is already running would
-   * just cancel it and start over, so ignore it.
-   * (Not `disabled`: the button should look the
-   * same during the initial load and only show
-   * feedback when the user clicks it.)
-   */
-  const busy =
-    refreshing ||
-    state.status ===
-      'loading';
-
   const refreshTitle =
     refreshing
       ? 'Refreshing\u2026'
@@ -640,9 +628,18 @@ export function OnlineFriendsPanel() {
                 : 'cfpm-friends-refresh'
             }
             onClick={() => {
-              if (!busy) {
-                refresh();
-              }
+              /*
+               * Always call refresh(): the poller itself already
+               * decides what a click means depending on what's
+               * going on (nothing running yet, a scan already in
+               * flight, too soon after the last one, ...) and
+               * always acknowledges it. Gating this on a "busy"
+               * flag used to silently swallow clicks made while
+               * the very first load was still in progress - which
+               * is exactly what "the button ignores my click"
+               * looks like.
+               */
+              refresh();
             }}
             title={
               refreshTitle

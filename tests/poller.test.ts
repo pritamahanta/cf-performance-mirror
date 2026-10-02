@@ -220,6 +220,30 @@ test('poller: manual refresh runs a fresh full check and shows feedback', async 
   poller.stop();
 });
 
+test('poller: refresh() clicked during the very first load is acknowledged, not dropped', async () => {
+  // Reproduces "the refresh button ignores my first click": clicking
+  // while the initial scan is still in flight (state still
+  // 'loading') must turn on `refreshing` right away, not silently
+  // do nothing and not start a second, redundant scan on top of it.
+  const friends = Array.from({ length: 30 }, (_, i) => `f${i}`);
+  const { api, stats } = makeApi({ friends, online: new Set(), latencyMs: 15 });
+  const v = fakeVisibility();
+  const poller = new OnlineFriendsPoller(api, v.visibility, FAST);
+  poller.start();
+
+  assert.equal(poller.getState().status, 'loading');
+  assert.equal(poller.getState().refreshing, false);
+
+  poller.refresh();
+
+  assert.equal(poller.getState().refreshing, true, 'the click must be reflected immediately, synchronously');
+  assert.equal(stats.friendsCalls, 1, 'must not start a second scan on top of the one already running');
+
+  await waitFor(poller, s => s.status === 'ready');
+  assert.equal(stats.friendsCalls, 1);
+  poller.stop();
+});
+
 test('poller: stop() aborts in-flight work and resets to loading', async () => {
   const friends = Array.from({ length: 100 }, (_, i) => `f${i}`);
   const { api, stats } = makeApi({ friends, online: new Set(['f0']), latencyMs: 20 });
