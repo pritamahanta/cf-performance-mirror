@@ -65,6 +65,9 @@ export interface TrackerState {
   entries: Array<[string, 0 | 1, number]>;
   infos: InfoSummary[];
   order: string[];
+
+  /* When each friend was last seen online, per Codeforces: [lowercased handle, epoch ms]. */
+  seen?: Array<[string, number]>;
 }
 
 export class OnlineTracker {
@@ -72,6 +75,7 @@ export class OnlineTracker {
   private infos = new Map<string, InfoSummary>();
   private attempts = new Map<string, InfoAttempt>();
   private names = new Map<string, string>();
+  private seen = new Map<string, number>();
   private order: string[] = [];
   private cycle = 0;
 
@@ -83,12 +87,15 @@ export class OnlineTracker {
         entry.online ? 1 : 0,
         entry.checkedAt,
       ]),
-      infos: Array.from(this.infos.values()).map(info => ({
-        handle: info.handle,
-        rating: info.rating,
-        rank: info.rank,
-      })),
+      infos: Array.from(this.infos.entries())
+        .filter(([key]) => this.entries.get(key)?.online === true)
+        .map(([, info]) => ({
+          handle: info.handle,
+          rating: info.rating,
+          rank: info.rank,
+        })),
       order: [...this.order],
+      seen: Array.from(this.seen.entries()),
     };
   }
 
@@ -197,6 +204,38 @@ export class OnlineTracker {
       });
     }
 
+    const nextSeen = new Map<string, number>();
+
+    if (candidate.seen !== undefined) {
+      if (!Array.isArray(candidate.seen)) {
+        return false;
+      }
+
+      for (const item of candidate.seen) {
+        if (!Array.isArray(item) || item.length !== 2) {
+          return false;
+        }
+
+        const [handle, at] = item as [unknown, unknown];
+
+        if (typeof handle !== 'string' || handle.length === 0 || handle.length > 64) {
+          return false;
+        }
+
+        if (typeof at !== 'number' || !Number.isFinite(at) || at < 0) {
+          return false;
+        }
+
+        const key = handle.toLowerCase();
+
+        if (!allowed.has(key)) {
+          return false;
+        }
+
+        nextSeen.set(key, at);
+      }
+    }
+
     const nextOrder: string[] = [];
     const seenOrder = new Set<string>();
 
@@ -220,6 +259,7 @@ export class OnlineTracker {
     this.names = nextNames;
     this.entries = nextEntries;
     this.infos = nextInfos;
+    this.seen = nextSeen;
     this.order = nextOrder;
     this.attempts.clear();
     this.cycle = previousCycle;
@@ -250,7 +290,7 @@ export class OnlineTracker {
       this.names.set(key, handle);
     }
 
-    for (const map of [this.entries, this.infos, this.attempts, this.names]) {
+    for (const map of [this.entries, this.infos, this.attempts, this.names, this.seen]) {
       for (const key of Array.from(map.keys())) {
         if (!keep.has(key)) {
           map.delete(key);
@@ -259,6 +299,81 @@ export class OnlineTracker {
     }
 
     this.order = this.order.filter(key => keep.has(key));
+  }
+
+  /*
+   * Ratings and "last seen" for friends, from one user.info pass over
+   * the whole list. Only the activity is used to decide whom to check
+   * first; being "online now" is still decided by their profile page.
+   */
+  applyActivity(users: CodeforcesUser[]): void {
+    for (const user of users) {
+      const key = user.handle.toLowerCase();
+
+      if (!this.names.has(key)) {
+        continue;
+      }
+
+      this.infos.set(key, { handle: user.handle, rating: user.rating, rank: user.rank });
+
+      const at = user.lastOnlineTimeSeconds;
+
+      if (typeof at === 'number' && Number.isFinite(at) && at > 0) {
+        this.seen.set(key, at * 1000);
+      }
+    }
+  }
+
+  /*
+   * The friends to check in one scan, most useful first:
+   *   1. everyone currently shown online (always all of them),
+   *   2. friends seen online within `hotWindowMs`, most recent first,
+   *   3. the rest, longest-unchecked first.
+   * At most `budget` friends beyond group 1 are included, and at least
+   * `coldReserve` of those come from group 3 whenever it has anyone, so
+   * nobody is skipped forever: hot friends that do not fit this time
+   * join group 3 and get their turn.
+   */
+  planScan(now: number, options: { hotWindowMs: number; budget: number; coldReserve: number }): string[] {
+    const indexOf = new Map<string, number>();
+    const online: string[] = [];
+    const hot: string[] = [];
+    let rest: string[] = [];
+
+    Array.from(this.names.keys()).forEach((key, index) => {
+      indexOf.set(key, index);
+
+      if (this.entries.get(key)?.online) {
+        online.push(key);
+
+        return;
+      }
+
+      const seenAt = this.seen.get(key);
+
+      if (seenAt !== undefined && now - seenAt <= options.hotWindowMs) {
+        hot.push(key);
+      } else {
+        rest.push(key);
+      }
+    });
+
+    const checkedAt = (key: string): number => this.entries.get(key)?.checkedAt ?? 0;
+    const byIndex = (a: string, b: string): number => (indexOf.get(a) ?? 0) - (indexOf.get(b) ?? 0);
+
+    online.sort((a, b) => checkedAt(a) - checkedAt(b) || byIndex(a, b));
+    hot.sort((a, b) => (this.seen.get(b) ?? 0) - (this.seen.get(a) ?? 0) || byIndex(a, b));
+
+    const budget = Math.max(0, options.budget);
+    const hotCap = Math.max(0, budget - Math.max(0, options.coldReserve));
+    const hotTake = hot.slice(0, hotCap);
+
+    rest = rest.concat(hot.slice(hotCap));
+    rest.sort((a, b) => checkedAt(a) - checkedAt(b) || byIndex(a, b));
+
+    const restTake = rest.slice(0, Math.max(0, budget - hotTake.length));
+
+    return [...online, ...hotTake, ...restTake].map(key => this.names.get(key) as string);
   }
 
   /*

@@ -501,6 +501,7 @@ const USER_INFO_CHUNK_GAP_MS =
 
 export async function fetchUsersInfo(
   handles: string[],
+  signal?: AbortSignal,
 ): Promise<
   CodeforcesUser[]
 > {
@@ -550,6 +551,10 @@ export async function fetchUsersInfo(
             USER_INFO_CHUNK_GAP_MS,
           ),
       );
+    }
+
+    if (signal?.aborted) {
+      throw new Error('Aborted.');
     }
 
     const response =

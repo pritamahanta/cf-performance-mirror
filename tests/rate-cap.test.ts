@@ -351,6 +351,7 @@ async function scanned(friends: string[], online: Set<string>, extra: Record<str
     maxConcurrency: 3,
     requestsPerSecond: 3000,
     requestBurst: 100,
+    scanBudget: 1000,
     ...extra,
   });
 
@@ -415,6 +416,7 @@ test('manual refresh: the spinner shows during a manual re-check of a big list',
     maxConcurrency: 3,
     requestsPerSecond: 3000,
     requestBurst: 100,
+    scanBudget: 1000,
   });
 
   poller.start();

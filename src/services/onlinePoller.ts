@@ -43,7 +43,7 @@ export type PollerState =
 export interface PollerApi {
   fetchFriends: (signal: AbortSignal) => Promise<string[]>;
   checkProfile: (handle: string, signal: AbortSignal) => Promise<OnlineStatus>;
-  fetchInfo: (handles: string[]) => Promise<CodeforcesUser[]>;
+  fetchInfo: (handles: string[], signal?: AbortSignal) => Promise<CodeforcesUser[]>;
 }
 
 export interface Visibility {
@@ -100,6 +100,22 @@ export interface PollerConfig {
   /* Above this many friends a manual refresh only re-checks who is shown online. */
   manualFullScanMaxFriends: number;
 
+  /*
+   * Order of a full scan: everyone shown online, then friends seen
+   * online within hotWindowMs (most recent first), then the rest,
+   * longest-unchecked first. This only changes WHEN a friend is
+   * checked within the scan, never WHETHER: with the default
+   * scanBudget (no limit) every friend is checked on their profile
+   * page in every scan. Lowering scanBudget limits how many friends
+   * beyond those shown online one scan covers (at least coldReserve
+   * of them from the rest) and trades coverage for speed. hotWindowMs
+   * of 0 turns the recency ordering off (plain longest-unchecked
+   * first).
+   */
+  hotWindowMs: number;
+  scanBudget: number;
+  coldReserve: number;
+
   /* Pool tuning: pause after 3 failures in a row, doubling up to the max... */
   poolBaseBackoffMs: number;
   poolMaxBackoffMs: number;
@@ -114,7 +130,7 @@ export interface PollerConfig {
 export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   intervalMs: 60_000,
   maxBackoffMs: 4 * 60_000,
-  fullScanGapFactor: 2,
+  fullScanGapFactor: 1,
   maxFullScanGapMs: 10 * 60_000,
   progressAfterMs: 2_000,
   flushMs: 300,
@@ -128,6 +144,9 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   requestBurst: 20,
   recheckOnlineEveryMs: 90_000,
   manualFullScanMaxFriends: 150,
+  hotWindowMs: 24 * 3_600_000,
+  scanBudget: Number.POSITIVE_INFINITY,
+  coldReserve: 30,
   poolBaseBackoffMs: 1_500,
   poolMaxBackoffMs: 20_000,
   poolBreakerLimit: 15,
@@ -700,6 +719,25 @@ export class OnlineFriendsPoller {
     this.lastPersistAt = snapshot.savedAt;
   }
 
+  private async refreshActivity(
+    epoch: number,
+    tracker: OnlineTracker,
+    signal: AbortSignal,
+    friends: string[],
+  ): Promise<void> {
+    try {
+      const users = await this.api.fetchInfo(friends, signal);
+
+      if (signal.aborted || epoch !== this.epoch || tracker !== this.tracker) {
+        return;
+      }
+
+      tracker.applyActivity(users);
+    } catch {
+      /* Keep what was known before; the scan order is just less sharp this time. */
+    }
+  }
+
   private async runCycle(mode: 'full' | 'quick', manual: boolean): Promise<void> {
     const epoch = this.epoch;
     const tracker = this.tracker;
@@ -741,7 +779,19 @@ export class OnlineFriendsPoller {
         }
 
         tracker.syncFriends(friends);
-        handles = tracker.plan();
+
+        /* One user.info pass: ratings for every row, and who was active lately. */
+        await this.refreshActivity(epoch, tracker, signal, friends);
+
+        if (signal.aborted) {
+          return;
+        }
+
+        handles = tracker.planScan(Date.now(), {
+          hotWindowMs: this.config.hotWindowMs,
+          budget: this.config.scanBudget,
+          coldReserve: this.config.coldReserve,
+        });
       } else {
         handles = tracker.onlineHandles();
       }
