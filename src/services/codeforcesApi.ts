@@ -18,6 +18,11 @@ import type {
   OnlineStatus,
 } from '../domain/onlineTracker';
 
+import {
+  LAST_VISIT_CONTEXT_CHARS,
+  findLastVisitLabel,
+} from '../domain/profileLocales';
+
 const API_BASE =
   'https://codeforces.com/api';
 
@@ -338,7 +343,11 @@ export async function fetchOnlineFriends(
  * friend) but is the only signal confirmed to be
  * accurate.
  *
- * Only a page that actually contains "Last visit:"
+ * The page is read in whatever language Codeforces
+ * serves it (English or Russian, see profileLocales.ts);
+ * the request never changes the user's language.
+ *
+ * Only a page with a "Last visit" value we understand
  * counts as an answer. Anything else (an error
  * status, a throttling or challenge page, a network
  * failure) is "unknown", never "offline", so a
@@ -348,10 +357,6 @@ export async function fetchOnlineFriends(
 /* The "Last visit" line sits near the top of the page; never read more than this. */
 const PROFILE_MAX_CHARS =
   600_000;
-
-/* Enough text after "Last visit:" to see whether it says "online now". */
-const PROFILE_CONTEXT_CHARS =
-  300;
 
 /*
  * Reads the profile response only until the
@@ -390,15 +395,15 @@ async function readProfileHead(
           { stream: true },
         );
 
-      const marker =
-        html.search(
-          /Last visit:/i,
+      const label =
+        findLastVisitLabel(
+          html,
         );
 
       if (
-        marker !== -1 &&
-        html.length - marker >=
-          PROFILE_CONTEXT_CHARS
+        label !== null &&
+        html.length - label.index >=
+          LAST_VISIT_CONTEXT_CHARS
       ) {
         break;
       }

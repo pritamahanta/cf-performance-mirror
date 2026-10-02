@@ -1,5 +1,11 @@
 import type { CodeforcesUser } from '../types/codeforces';
 import type { OnlineFriend } from './friends';
+import {
+  findLastVisitLabel,
+  isOnlineValue,
+  looksLikeElapsedTime,
+  readLastVisitValue,
+} from './profileLocales';
 
 /*
  * Result of checking one friend.
@@ -12,26 +18,29 @@ import type { OnlineFriend } from './friends';
 export type OnlineStatus = 'online' | 'offline' | 'unknown';
 
 /*
- * A profile page shows "Last visit: online now" for someone who is
- * online, and "Last visit: 3 hours ago" (or similar) for everyone
- * else. Any page without the "Last visit:" text (an error page,
- * a challenge page, a truncated response) tells us nothing.
+ * A profile page has a "Last visit" line: "online now" for someone
+ * who is online, and "3 hours ago" (or similar) for everyone else.
+ * The wording depends on the site language; see profileLocales.ts.
+ *
+ * Only a page whose "Last visit" value is understood counts as an
+ * answer. Anything else (an error page, a challenge page, a truncated
+ * response, a language we don't know) tells us nothing and is
+ * "unknown", never "offline".
  */
-const PROFILE_ONLINE_PATTERN =
-  /Last visit:\s*(?:<[^>]+>\s*)*online now/i;
-
-const PROFILE_LAST_VISIT_PATTERN = /Last visit:/i;
-
 export function classifyProfileHtml(html: string): OnlineStatus {
-  if (PROFILE_ONLINE_PATTERN.test(html)) {
+  const label = findLastVisitLabel(html);
+
+  if (!label) {
+    return 'unknown';
+  }
+
+  const value = readLastVisitValue(html, label.end);
+
+  if (isOnlineValue(value)) {
     return 'online';
   }
 
-  if (PROFILE_LAST_VISIT_PATTERN.test(html)) {
-    return 'offline';
-  }
-
-  return 'unknown';
+  return looksLikeElapsedTime(value) ? 'offline' : 'unknown';
 }
 
 /*

@@ -52,12 +52,17 @@ function findProblemRatingsBox(): Element | null {
  * mistaken for it. Boxes without a caption fall
  * back to matching their whole text, as before.
  */
-function findSidebarBoxByText(
+export function findSidebarBoxByText(
   sidebar: Element,
-  text: string,
+  text: string | readonly string[],
 ): Element | null {
-  const target =
-    text.toLowerCase();
+  const targets =
+    (typeof text === 'string'
+      ? [text]
+      : text
+    ).map(item =>
+      item.toLowerCase(),
+    );
 
   const boxes =
     sidebar.querySelectorAll(
@@ -75,7 +80,9 @@ function findSidebarBoxByText(
         .toLowerCase() ?? '';
 
     if (
-      label.includes(target)
+      targets.some(target =>
+        label.includes(target),
+      )
     ) {
       return box;
     }
@@ -132,7 +139,8 @@ export function mountOnlineFriendsHost():
   const anchor =
     findSidebarBoxByText(
       sidebar,
-      'top rated',
+      /* The Russian site titles this box "Лидеры (рейтинг)". */
+      ['top rated', 'лидеры (рейтинг)'],
     ) ??
     findSidebarBoxByText(
       sidebar,
