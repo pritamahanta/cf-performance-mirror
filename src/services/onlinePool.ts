@@ -27,6 +27,15 @@ export interface PoolOptions {
    * included, takes one token. Omit for no cap.
    */
   limiter?: RateLimiter | null;
+
+  /*
+   * Longest an individual attempt may take. `check` is documented to
+   * always resolve "unknown" rather than throw, but nothing forces a
+   * hung promise (a connection that never responds) to honor that -
+   * one such attempt would otherwise occupy its concurrency slot
+   * forever and the pool would never finish. 0 turns this off.
+   */
+  requestTimeoutMs?: number;
 }
 
 export interface PoolSummary {
@@ -78,6 +87,7 @@ export function checkHandles(
     baseBackoffMs = 1_500,
     maxBackoffMs = 20_000,
     limiter = null,
+    requestTimeoutMs = 20_000,
   } = options;
 
   return new Promise(resolve => {
@@ -235,9 +245,71 @@ export function checkHandles(
     const start = (item: Item) => {
       running += 1;
 
-      check(item.handle, signal).then(
-        status => settle(item, status),
-        () => settle(item, 'unknown'),
+      /*
+       * A per-attempt controller, separate from the pool's own
+       * `signal`, so this one attempt can be cut loose on its own
+       * timeout without needing to cancel anything else - and so
+       * the pool keeps moving even if `check` ignores its signal
+       * argument entirely (see requestTimeoutMs on PoolOptions).
+       */
+      const attemptController = new AbortController();
+
+      const abortAttempt = () => {
+        attemptController.abort();
+      };
+
+      if (signal.aborted) {
+        abortAttempt();
+      } else {
+        signal.addEventListener('abort', abortAttempt, {
+          once: true,
+        });
+      }
+
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      let settled = false;
+
+      const finishAttempt = (status: OnlineStatus) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+
+        if (timer !== null) {
+          clearTimeout(timer);
+        }
+
+        signal.removeEventListener(
+          'abort',
+          abortAttempt,
+        );
+
+        settle(item, status);
+      };
+
+      if (requestTimeoutMs > 0) {
+        timer = setTimeout(() => {
+          timer = null;
+
+          /*
+           * Best effort: if `check` does watch its signal (the
+           * real implementation does), this frees the underlying
+           * connection too instead of leaving it to time out on
+           * its own.
+           */
+          abortAttempt();
+
+          finishAttempt('unknown');
+        }, requestTimeoutMs);
+      }
+
+      check(
+        item.handle,
+        attemptController.signal,
+      ).then(
+        status => finishAttempt(status),
+        () => finishAttempt('unknown'),
       );
     };
 

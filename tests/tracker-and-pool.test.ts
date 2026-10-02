@@ -199,6 +199,73 @@ test('pool: abort resolves promptly and reports nothing afterwards', async () =>
   assert.equal(reported, atAbort);
 });
 
+test('pool: a request that never settles does not block the rest of the batch', async () => {
+  const results: Record<string, OnlineStatus> = {};
+  const summary = await checkHandles(['a', 'b', 'c'], {
+    signal: never,
+    retries: 0,
+    requestTimeoutMs: 30,
+    check: async (h, signal) => {
+      if (h === 'b') {
+        // A connection that never responds and never rejects -
+        // no 'unknown', no throw, nothing. Only a timeout can end it.
+        return new Promise<OnlineStatus>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')));
+        });
+      }
+      return 'offline';
+    },
+    onResult: (h, s) => {
+      results[h] = s;
+    },
+  });
+  assert.equal(summary.done, 3);
+  assert.equal(results.a, 'offline');
+  assert.equal(results.b, 'unknown');
+  assert.equal(results.c, 'offline');
+});
+
+test('pool: still finishes even if check() ignores its signal entirely', async () => {
+  const results: Record<string, OnlineStatus> = {};
+  await checkHandles(['a', 'b'], {
+    signal: never,
+    retries: 0,
+    requestTimeoutMs: 30,
+    check: async h => (h === 'a' ? new Promise<OnlineStatus>(() => {}) : 'offline'),
+    onResult: (h, s) => {
+      results[h] = s;
+    },
+  });
+  assert.equal(results.a, 'unknown');
+  assert.equal(results.b, 'offline');
+});
+
+test('pool: a slow but eventually-successful check is not mistaken for a timeout', async () => {
+  const results: Record<string, OnlineStatus> = {};
+  await checkHandles(['a'], {
+    signal: never,
+    requestTimeoutMs: 200,
+    check: () => new Promise<OnlineStatus>(resolve => setTimeout(() => resolve('online'), 20)),
+    onResult: (h, s) => {
+      results[h] = s;
+    },
+  });
+  assert.equal(results.a, 'online');
+});
+
+test('pool: requestTimeoutMs: 0 disables the per-attempt timeout', async () => {
+  const results: Record<string, OnlineStatus> = {};
+  await checkHandles(['a'], {
+    signal: never,
+    requestTimeoutMs: 0,
+    check: () => new Promise<OnlineStatus>(resolve => setTimeout(() => resolve('online'), 30)),
+    onResult: (h, s) => {
+      results[h] = s;
+    },
+  });
+  assert.equal(results.a, 'online');
+});
+
 test('pool: empty input finishes immediately', async () => {
   const summary = await checkHandles([], {
     signal: never,

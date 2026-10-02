@@ -123,6 +123,15 @@ export interface PollerConfig {
   /* ...and give up on a scan after this many failed checks in a row. */
   poolBreakerLimit: number;
 
+  /*
+   * Longest a single profile check may take before it is treated as
+   * failed (and freed up for retry/backoff like any other failure).
+   * Without this, one request that never responds - no error, no
+   * timeout of its own - would sit in the pool forever and the scan
+   * would never finish. 0 turns it off.
+   */
+  poolRequestTimeoutMs: number;
+
   /* Show "incomplete" when at least this share of a full scan failed. */
   incompleteShare: number;
 }
@@ -150,6 +159,7 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   poolBaseBackoffMs: 1_500,
   poolMaxBackoffMs: 20_000,
   poolBreakerLimit: 15,
+  poolRequestTimeoutMs: 20_000,
   incompleteShare: 0.05,
 };
 
@@ -805,6 +815,7 @@ export class OnlineFriendsPoller {
           baseBackoffMs: this.config.poolBaseBackoffMs,
           maxBackoffMs: this.config.poolMaxBackoffMs,
           breakerLimit: this.config.poolBreakerLimit,
+          requestTimeoutMs: this.config.poolRequestTimeoutMs,
           limiter: this.limiter,
           check: this.api.checkProfile,
           onResult: (handle, status) => {
