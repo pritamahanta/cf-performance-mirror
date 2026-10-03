@@ -83,6 +83,54 @@ test('plan: the budget caps hot friends, keeps a cold reserve, and overflow gets
   assert.ok(rest.every(h => !['f0', 'f1', 'f2', 'f3'].includes(h)));
 });
 
+/*
+ * On a page-per-profile site, navigating clicks away the content script
+ * before a full scan can finish, so full scans can be interrupted
+ * repeatedly and go on cooldown. planQuick is what runs in between -
+ * it must make real progress on friends the full scan never reached,
+ * not just re-confirm whoever is already online.
+ */
+test('planQuick: re-checks everyone online, plus a bounded batch of the longest-unchecked', () => {
+  const t = trackerWith(names(50));
+
+  t.record('f10', 'online', NOW);
+  t.record('f11', 'online', NOW);
+
+  const plan = t.planQuick(5);
+
+  assert.equal(plan.length, 7, 'the 2 online friends plus a cold batch of 5');
+  assert.ok(plan.includes('f10') && plan.includes('f11'), 'both online friends are re-checked');
+  assert.ok(!plan.slice(2).some(h => h === 'f10' || h === 'f11'), 'online friends are not double-counted in the cold batch');
+});
+
+test('planQuick: with nobody online yet, still returns a bounded batch, not the whole list', () => {
+  const t = trackerWith(names(50));
+
+  const plan = t.planQuick(5);
+
+  assert.equal(plan.length, 5, 'exactly the cold budget - this is what used to be zero and starved the list');
+});
+
+test('planQuick: a friend it just checked drops to the back of the next cold batch', () => {
+  const t = trackerWith(names(10));
+
+  const first = t.planQuick(4);
+  assert.deepEqual(first, ['f0', 'f1', 'f2', 'f3']);
+
+  for (const h of first) t.record(h, 'offline', NOW);
+
+  const second = t.planQuick(4);
+  assert.deepEqual(second, ['f4', 'f5', 'f6', 'f7'], 'already-checked friends make way for the rest');
+});
+
+test('planQuick: coldBudget of 0 falls back to exactly the online friends, as before', () => {
+  const t = trackerWith(names(20));
+
+  t.record('f3', 'online', NOW);
+
+  assert.deepEqual(t.planQuick(0), ['f3']);
+});
+
 test('plan: without activity data every friend is in the rest, capped by the budget', () => {
   const t = trackerWith(names(40));
   const plan = t.planScan(NOW, OPTS);

@@ -454,6 +454,48 @@ export class OnlineTracker {
     return result;
   }
 
+  /*
+   * Handles for a "quick" cycle: everyone currently shown online (so the
+   * visible list stays fresh), plus up to `coldBudget` friends that have
+   * never been checked yet or were checked longest ago.
+   *
+   * A full scan can keep getting interrupted before it reaches anyone
+   * outside the online group - most commonly by the page being navigated
+   * away, which on a page-per-profile site happens on every click and
+   * tears the scan down with no chance to finish or even save progress.
+   * Without this, quick cycles - the only thing that runs while a full
+   * scan is on cooldown after such an interruption - would only ever
+   * re-confirm already-online friends, and anyone else would never be
+   * checked for as long as full scans keep getting interrupted.
+   */
+  planQuick(coldBudget: number): string[] {
+    const online = this.onlineHandles();
+
+    if (coldBudget <= 0) {
+      return online;
+    }
+
+    const onlineKeys = new Set(online.map(handle => handle.toLowerCase()));
+    const indexOf = new Map<string, number>();
+    const cold: string[] = [];
+
+    Array.from(this.names.keys()).forEach((key, index) => {
+      indexOf.set(key, index);
+
+      if (!onlineKeys.has(key)) {
+        cold.push(key);
+      }
+    });
+
+    const checkedAt = (key: string): number => this.entries.get(key)?.checkedAt ?? 0;
+
+    cold.sort((a, b) => checkedAt(a) - checkedAt(b) || (indexOf.get(a) ?? 0) - (indexOf.get(b) ?? 0));
+
+    const coldTake = cold.slice(0, coldBudget).map(key => this.names.get(key) as string);
+
+    return [...online, ...coldTake];
+  }
+
   record(handle: string, status: OnlineStatus, now: number): void {
     if (status === 'unknown') {
       return;

@@ -116,6 +116,18 @@ export interface PollerConfig {
   scanBudget: number;
   coldReserve: number;
 
+  /*
+   * A "quick" cycle (the only kind that runs while a full scan isn't due
+   * yet, including while one is on cooldown after being interrupted)
+   * always re-checks everyone currently shown online, plus up to this
+   * many friends that have never been checked yet or were checked
+   * longest ago. Without this, a full scan that keeps getting
+   * interrupted before finishing (e.g. the page is navigated away) would
+   * starve: quick cycles would only ever re-confirm already-online
+   * friends, and nobody else would ever get checked.
+   */
+  quickColdBudget: number;
+
   /* Pool tuning: pause after 3 failures in a row, doubling up to the max... */
   poolBaseBackoffMs: number;
   poolMaxBackoffMs: number;
@@ -156,6 +168,7 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   hotWindowMs: 24 * 3_600_000,
   scanBudget: Number.POSITIVE_INFINITY,
   coldReserve: 30,
+  quickColdBudget: 10,
   poolBaseBackoffMs: 1_500,
   poolMaxBackoffMs: 20_000,
   poolBreakerLimit: 15,
@@ -561,7 +574,16 @@ export class OnlineFriendsPoller {
       return 'full';
     }
 
-    if (this.tracker.onlineHandles().length === 0) {
+    /*
+     * Nothing to do only when there is no friend data at all yet. As
+     * long as there is at least one friend, a "quick" cycle always has
+     * useful work: either friends to re-confirm as online, or - via
+     * planQuick's cold budget - friends still waiting on their first
+     * check. onlineHandles().length === 0 on its own is NOT "nothing to
+     * do": it is exactly the state a quick cycle needs to make progress
+     * on an interrupted full scan.
+     */
+    if (this.tracker.friendCount() === 0) {
       return 'none';
     }
 
@@ -803,7 +825,7 @@ export class OnlineFriendsPoller {
           coldReserve: this.config.coldReserve,
         });
       } else {
-        handles = tracker.onlineHandles();
+        handles = tracker.planQuick(this.config.quickColdBudget);
       }
 
       let checked = 0;

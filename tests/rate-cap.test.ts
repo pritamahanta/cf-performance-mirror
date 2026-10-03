@@ -371,31 +371,35 @@ test('manual refresh: a small list gets a full scan', async () => {
   poller.stop();
 });
 
-test('manual refresh: a big list only re-checks the friends shown online', async () => {
-  const { poller, calls } = await scanned(friendsOf(400), new Set(['f1', 'f2']));
+test('manual refresh: a big list re-checks the friends shown online plus a bounded cold batch', async () => {
+  const { poller, calls } = await scanned(friendsOf(400), new Set(['f1', 'f2']), { quickColdBudget: 5 });
   const friendsBefore = calls.friends;
   const checksBefore = calls.order.length;
 
   poller.refresh();
-  await waitFor(() => calls.order.length >= checksBefore + 2);
+  await waitFor(() => calls.order.length >= checksBefore + 7);
   await sleep(60);
   poller.stop();
 
   assert.equal(calls.friends, friendsBefore, 'no friends-page fetch');
-  assert.equal(calls.order.length - checksBefore, 2, 'exactly the two online friends');
+  assert.equal(calls.order.length - checksBefore, 7, 'the two online friends plus the 5-friend cold budget');
+
+  const rechecked = calls.order.slice(checksBefore);
+  assert.ok(rechecked.includes('f1') && rechecked.includes('f2'), 'both online friends were re-checked');
 });
 
-test('manual refresh: a big list with nobody online makes no requests', async () => {
-  const { poller, calls } = await scanned(friendsOf(400), new Set());
+test('manual refresh: a big list with nobody online still checks a bounded cold batch, never the whole list', async () => {
+  const { poller, calls } = await scanned(friendsOf(400), new Set(), { quickColdBudget: 5 });
   const friendsBefore = calls.friends;
   const checksBefore = calls.order.length;
 
   poller.refresh();
-  await sleep(120);
+  await waitFor(() => calls.order.length >= checksBefore + 5);
+  await sleep(60);
   poller.stop();
 
-  assert.equal(calls.friends, friendsBefore);
-  assert.equal(calls.order.length, checksBefore);
+  assert.equal(calls.friends, friendsBefore, 'no friends-page fetch');
+  assert.equal(calls.order.length - checksBefore, 5, 'exactly the cold budget, not the whole list');
 });
 
 test('manual refresh: the spinner shows during a manual re-check of a big list', async () => {

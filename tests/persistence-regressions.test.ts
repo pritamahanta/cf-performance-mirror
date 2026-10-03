@@ -34,10 +34,10 @@ function fakePersistence(seed: PersistedSnapshot | null, lock: { held: boolean }
 }
 
 function fakeApi(friends: string[], onlineSet: Set<string>, friendsDelay = 0) {
-  const calls = { friends: 0, checks: 0 };
+  const calls = { friends: 0, checks: 0, order: [] as string[] };
   const api: PollerApi = {
     fetchFriends: async () => { calls.friends++; if (friendsDelay) await sleep(friendsDelay); return friends; },
-    checkProfile: async h => { calls.checks++; await sleep(2); return onlineSet.has(h) ? 'online' : 'offline'; },
+    checkProfile: async h => { calls.checks++; calls.order.push(h); await sleep(2); return onlineSet.has(h) ? 'online' : 'offline'; },
     fetchInfo: async hs => hs.map(handle => ({ handle, rating: 1500, rank: 'x' })),
   };
   return { api, calls };
@@ -107,4 +107,50 @@ test('cleanup: wiping other accounts keeps no stale keys', () => {
   createBrowserPersistence({ storage, doc, win: { addEventListener() {}, removeEventListener() {} } });
   const left = Array.from(data.keys()).filter(k => k.startsWith(STORAGE_PREFIX));
   assert.deepEqual(left, [], `stale keys left: ${left.join(',')}`);
+});
+
+test('navigation: an interrupted full scan does not starve friends outside the online group', async () => {
+  // Codeforces is page-per-profile, so every click to a new profile
+  // tears down the content script and spins up a brand new poller
+  // against the same persisted store. A full scan over a big friend
+  // list takes a while, so clicking quickly tears it down mid-scan,
+  // over and over, before it ever reaches anyone outside the online
+  // group. The next cycle after an interruption is always "quick"
+  // (the just-interrupted full scan goes on cooldown) - it must still
+  // check friends the full scan never got to, not just re-confirm
+  // whoever is already online (nobody, here).
+  const friends = Array.from({ length: 300 }, (_, i) => 'f' + i);
+  const { p } = fakePersistence(null, { held: false });
+  const { api, calls } = fakeApi(friends, new Set());
+
+  // Round 1: starts a full scan, then the page is "navigated away"
+  // well before it can finish.
+  const first = new OnlineFriendsPoller(api, visible, { ...FAST, maxConcurrency: 3 }, p);
+  first.start();
+  await sleep(20);
+  first.stop();
+
+  const afterRound1 = calls.order.length;
+  assert.ok(afterRound1 > 0, 'the interrupted scan should have checked at least a few friends');
+  assert.ok(afterRound1 < friends.length, 'the full scan must not have finished - that is this test\'s premise');
+
+  // Round 2: the next page. The full scan just got interrupted, so
+  // it is on cooldown (resumeMinGapMs) and this can only run a quick
+  // cycle.
+  const second = new OnlineFriendsPoller(api, visible, { ...FAST, maxConcurrency: 3, quickColdBudget: 8 }, p);
+  second.start();
+
+  const deadline = Date.now() + 2000;
+  while (calls.order.length < afterRound1 + 8 && Date.now() < deadline) {
+    await sleep(5);
+  }
+
+  second.stop();
+
+  assert.equal(
+    calls.order.length - afterRound1,
+    8,
+    `a quick cycle after an interrupted full scan checked ${calls.order.length - afterRound1} new friends, ` +
+      'expected exactly the 8-friend cold budget - this is what used to be 0 and starved the list forever',
+  );
 });
