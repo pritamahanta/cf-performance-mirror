@@ -33,6 +33,10 @@ import {
 } from '../../hooks/useOnlineFriends';
 
 import {
+  toggleFriendsVisible,
+} from '../../services/storage';
+
+import {
   FriendSubmissionsPopup,
 } from './FriendSubmissionsPopup';
 
@@ -212,6 +216,25 @@ function SubmissionsIcon() {
   );
 }
 
+/* Same chevron as the main cfpm panel's own collapse button. */
+function ChevronIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 13 13"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 4.5l4 4 4-4" />
+    </svg>
+  );
+}
+
 export function OnlineFriendsPanel() {
   const visible =
     useFriendsVisible();
@@ -300,10 +323,6 @@ export function OnlineFriendsPanel() {
     openFriend,
   ]);
 
-  if (!visible) {
-    return null;
-  }
-
   const openedFriend =
     openFriend &&
     state.status ===
@@ -373,9 +392,52 @@ export function OnlineFriendsPanel() {
   return (
     <div className="roundbox sidebox borderTopRound">
       <div className="caption titled">
-        {'\u2192 Online friends'}
+        <span>
+          {'\u2192 Online friends'}
+        </span>
+
+        <button
+          id="cfpm-friends-chevron-btn"
+          type="button"
+          className={
+            visible
+              ? ''
+              : 'collapsed'
+          }
+          title={
+            visible
+              ? 'Hide online friends'
+              : 'Show online friends'
+          }
+          aria-label={
+            visible
+              ? 'Hide online friends'
+              : 'Show online friends'
+          }
+          aria-expanded={
+            visible
+          }
+          onClick={() => {
+            /*
+             * Reads the full saved settings fresh from
+             * storage, flips just this one flag, and
+             * writes the whole object back - never a
+             * partial patch, since saveSettings()
+             * overwrites storage with exactly what it's
+             * given. Dispatches the same event
+             * useFriendsVisible() and the profile page's
+             * Controls panel both already listen for, so
+             * every surface stays in sync.
+             */
+            toggleFriendsVisible();
+          }}
+        >
+          <ChevronIcon />
+        </button>
       </div>
 
+      {visible && (
+        <>
       {state.status ===
         'loading' && (
         <div
@@ -689,6 +751,8 @@ export function OnlineFriendsPanel() {
             }
           />
         )}
+        </>
+      )}
     </div>
   );
 }

@@ -34,6 +34,15 @@ import {
 } from '../hooks/usePerformanceData';
 
 import {
+  normalizeSettings,
+} from '../domain/settings';
+
+import {
+  SETTINGS_CHANGED_EVENT,
+  loadSettings,
+} from '../services/storage';
+
+import {
   PerformanceTable,
 } from './PerformanceTable';
 
@@ -193,6 +202,49 @@ export function PerformanceMirror({
     settings,
     onSettingsChange,
   ]);
+
+  /*
+   * friendsVisible can now also be toggled from the
+   * Online Friends box's own button, in a separate
+   * React root that saves straight to storage. Without
+   * this, this panel's own local `settings` copy would
+   * go stale after that - and the next change made
+   * here (even an unrelated one, like the category)
+   * would silently write the stale value back,
+   * clobbering the Online Friends box's toggle.
+   */
+  useEffect(() => {
+    const sync = () => {
+      const fresh =
+        normalizeSettings(
+          loadSettings(),
+        ).friendsVisible;
+
+      setSettings(
+        current =>
+          current.friendsVisible ===
+          fresh
+            ? current
+            : {
+                ...current,
+                friendsVisible:
+                  fresh,
+              },
+      );
+    };
+
+    window.addEventListener(
+      SETTINGS_CHANGED_EVENT,
+      sync,
+    );
+
+    return () => {
+      window.removeEventListener(
+        SETTINGS_CHANGED_EVENT,
+        sync,
+      );
+    };
+  }, []);
 
   const updateSettings = (
     patch: Partial<ExtensionSettings>,

@@ -19,6 +19,25 @@
       #cfpm-chevron-btn svg { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
       #cfpm-chevron-btn.collapsed svg { transform: rotate(-90deg); }
 
+      /* Online Friends' own on/off button - same chevron behavior, scoped to its own box
+         so it never touches `.caption.titled`, a class Codeforces uses on other sidebar
+         boxes too. */
+      #cfpm-online-friends .caption.titled {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      }
+      #cfpm-friends-chevron-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 20px; height: 20px; border-radius: 4px;
+        border: none; background: transparent; cursor: pointer; color: inherit;
+        flex-shrink: 0; outline: none !important;
+        -webkit-appearance: none; appearance: none; padding: 0;
+      }
+      #cfpm-friends-chevron-btn:hover { background: rgba(128,128,128,0.15) !important; }
+      #cfpm-friends-chevron-btn:focus, #cfpm-friends-chevron-btn:active,
+      #cfpm-friends-chevron-btn:focus-visible { outline: none !important; box-shadow: none !important; }
+      #cfpm-friends-chevron-btn svg { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
+      #cfpm-friends-chevron-btn.collapsed svg { transform: rotate(-90deg); }
+
       #cfpm-compact button {
         box-sizing: border-box; -webkit-appearance: none; appearance: none;
         transition: none !important;

@@ -1,4 +1,5 @@
 import type { ExtensionSettings, SavedSettings } from '../types/settings';
+import { normalizeSettings } from '../domain/settings';
 
 export const SETTINGS_KEY = 'cfpm_defaults';
 export const TOGGLE_KEY = 'cfpm_enabled';
@@ -25,6 +26,21 @@ export function saveSettings(settings: Partial<ExtensionSettings>, storage: Stor
   } catch {
     // Preserve legacy behavior: storage failures are non-fatal.
   }
+}
+
+/*
+ * Flips `friendsVisible` and persists it. Reads the full saved
+ * settings fresh from storage rather than taking a value from the
+ * caller - saveSettings() overwrites storage with exactly what it's
+ * given, so writing a bare `{friendsVisible}` patch here would wipe
+ * every other saved setting (category, timeline, hideAC, ...).
+ * Returns the new value.
+ */
+export function toggleFriendsVisible(storage: Storage = localStorage): boolean {
+  const next = normalizeSettings(loadSettings(storage));
+  next.friendsVisible = !next.friendsVisible;
+  saveSettings(next, storage);
+  return next.friendsVisible;
 }
 
 export function loadToggle(storage: Storage = localStorage): boolean {
