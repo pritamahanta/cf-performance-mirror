@@ -23,6 +23,8 @@ import {
   findLastVisitLabel,
 } from '../domain/profileLocales';
 
+import { withDeadline } from './deadline';
+
 const API_BASE =
   'https://codeforces.com/api';
 
@@ -180,6 +182,10 @@ export async function fetchContestSubmissionsByHandle(
     : [];
 }
 
+/* Longest the friends page may take, request and body together. */
+const FRIENDS_PAGE_TIMEOUT_MS =
+  20_000;
+
 /*
  * Codeforces' user.friends?onlyOnline=true
  * requires API authorization.
@@ -192,27 +198,67 @@ export async function fetchContestSubmissionsByHandle(
  */
 export async function fetchOnlineFriends(
   signal?: AbortSignal,
+  timeoutMs = FRIENDS_PAGE_TIMEOUT_MS,
 ): Promise<
   string[]
 > {
-  const response =
-    await fetch(
-      'https://codeforces.com/friends',
-      {
-        credentials: 'include',
-        cache: 'no-store',
-        signal,
-      },
-    );
+  /*
+   * A time limit on the whole read (request and body), so a connection
+   * that stalls can't hold up the scan forever. Aborting the caller's
+   * `signal` still cancels it right away.
+   */
+  const limit =
+    new AbortController();
 
-  if (!response.ok) {
-    throw new Error(
-      'Could not load your Codeforces friends page.',
+  const relay = () => {
+    limit.abort();
+  };
+
+  if (signal?.aborted) {
+    relay();
+  } else {
+    signal?.addEventListener(
+      'abort',
+      relay,
+      { once: true },
     );
   }
 
-  const html =
-    await response.text();
+  const timer =
+    setTimeout(
+      relay,
+      timeoutMs,
+    );
+
+  let html: string;
+
+  try {
+    const response =
+      await fetch(
+        'https://codeforces.com/friends',
+        {
+          credentials: 'include',
+          cache: 'no-store',
+          signal: limit.signal,
+        },
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        'Could not load your Codeforces friends page.',
+      );
+    }
+
+    html =
+      await response.text();
+  } finally {
+    clearTimeout(timer);
+
+    signal?.removeEventListener(
+      'abort',
+      relay,
+    );
+  }
 
   const doc =
     new DOMParser().parseFromString(
@@ -504,9 +550,19 @@ const USER_INFO_CHUNK_SIZE =
 const USER_INFO_CHUNK_GAP_MS =
   2_100;
 
+/*
+ * Longest the extension waits for one user.info chunk. The background
+ * worker gives up on its own request a little sooner (see
+ * public/background.js), so this is the backstop for a worker that
+ * never answers at all.
+ */
+const USER_INFO_TIMEOUT_MS =
+  20_000;
+
 export async function fetchUsersInfo(
   handles: string[],
   signal?: AbortSignal,
+  timeoutMs = USER_INFO_TIMEOUT_MS,
 ): Promise<
   CodeforcesUser[]
 > {
@@ -563,13 +619,18 @@ export async function fetchUsersInfo(
     }
 
     const response =
-      (await runtime.sendMessage(
-        {
-          type:
-            'CFPM_FETCH_USER_INFO',
-          handles:
-            chunks[index],
-        },
+      (await withDeadline(
+        runtime.sendMessage(
+          {
+            type:
+              'CFPM_FETCH_USER_INFO',
+            handles:
+              chunks[index],
+          },
+        ),
+        timeoutMs,
+        signal,
+        'Codeforces user.info',
       )) as UserInfoResponse;
 
     if (!response?.ok) {

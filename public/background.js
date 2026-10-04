@@ -1,5 +1,8 @@
 const API_BASE = 'https://codeforces.com/api';
 
+/* Shorter than the page-side wait for this reply (20s), so the real error arrives first. */
+const FETCH_TIMEOUT_MS = 15000;
+
 chrome.runtime.onMessage.addListener(
   (message, sender, sendResponse) => {
     if (
@@ -36,22 +39,43 @@ chrome.runtime.onMessage.addListener(
             )
             .join(';');
 
-        const response =
-          await fetch(
-            `${API_BASE}/user.info?handles=${params}`,
-            {
-              cache: 'no-store',
-            },
+        /*
+         * Give up after a while so a stalled connection can't leave
+         * this request, and the page waiting on it, hanging. The
+         * limit covers reading the body too.
+         */
+        const limit =
+          new AbortController();
+
+        const timer =
+          setTimeout(
+            () => limit.abort(),
+            FETCH_TIMEOUT_MS,
           );
 
-        if (!response.ok) {
-          throw new Error(
-            `Codeforces API HTTP ${response.status}`,
-          );
+        let data;
+
+        try {
+          const response =
+            await fetch(
+              `${API_BASE}/user.info?handles=${params}`,
+              {
+                cache: 'no-store',
+                signal: limit.signal,
+              },
+            );
+
+          if (!response.ok) {
+            throw new Error(
+              `Codeforces API HTTP ${response.status}`,
+            );
+          }
+
+          data =
+            await response.json();
+        } finally {
+          clearTimeout(timer);
         }
-
-        const data =
-          await response.json();
 
         if (data.status !== 'OK') {
           throw new Error(

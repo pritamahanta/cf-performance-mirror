@@ -1,5 +1,6 @@
 import type { CodeforcesUser } from '../types/codeforces';
 import type { OnlineFriend } from '../domain/friends';
+import { withDeadline } from './deadline';
 import { OnlineTracker } from '../domain/onlineTracker';
 import { ONLINE_TTL_MS, type OnlineStatus } from '../domain/onlineTracker';
 import type { Persistence, PersistedSnapshot } from './onlineStore';
@@ -128,6 +129,21 @@ export interface PollerConfig {
    */
   quickColdBudget: number;
 
+  /*
+   * Hard deadlines for the calls a cycle makes besides profile checks.
+   * Every call has its own timeout in the API layer; these are the
+   * backstop that guarantees a cycle can never wait forever, even if
+   * a call ignores its own timeout and abort signal. A cycle that
+   * never ends would also keep the shared scan lock and stop every
+   * other tab from scanning. 0 turns a deadline off.
+   *
+   * friendsTimeoutMs: the friends page.
+   * infoTimeoutMs: ONE user.info request (100 handles); a call that
+   * needs several gets this much for each, plus the gap between them.
+   */
+  friendsTimeoutMs: number;
+  infoTimeoutMs: number;
+
   /* Pool tuning: pause after 3 failures in a row, doubling up to the max... */
   poolBaseBackoffMs: number;
   poolMaxBackoffMs: number;
@@ -169,6 +185,8 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   scanBudget: Number.POSITIVE_INFINITY,
   coldReserve: 30,
   quickColdBudget: 10,
+  friendsTimeoutMs: 30_000,
+  infoTimeoutMs: 30_000,
   poolBaseBackoffMs: 1_500,
   poolMaxBackoffMs: 20_000,
   poolBreakerLimit: 15,
@@ -181,6 +199,9 @@ const LOAD_ERROR_MESSAGE =
 
 const CHECK_ERROR_MESSAGE =
   "Couldn't check who's online right now. Retrying automatically.";
+
+/* Handles per user.info request (must match the API layer). */
+const INFO_CHUNK_SIZE = 100;
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise(resolve => {
@@ -749,6 +770,14 @@ export class OnlineFriendsPoller {
 
     this.persistence.save(snapshot);
     this.lastPersistAt = snapshot.savedAt;
+
+    /*
+     * Our own save is not news from another tab. Without this the next
+     * tick "adopts" it, returns early, and throws the click that
+     * triggered the tick away (a manual refresh did nothing the first
+     * time).
+     */
+    this.lastAdoptedSavedAt = Math.max(this.lastAdoptedSavedAt, snapshot.savedAt);
   }
 
   private async refreshActivity(
@@ -758,7 +787,16 @@ export class OnlineFriendsPoller {
     friends: string[],
   ): Promise<void> {
     try {
-      const users = await this.api.fetchInfo(friends, signal);
+      const requests = Math.max(1, Math.ceil(friends.length / INFO_CHUNK_SIZE));
+
+      const users = await withDeadline(
+        this.api.fetchInfo(friends, signal),
+        this.config.infoTimeoutMs > 0
+          ? requests * (this.config.infoTimeoutMs + this.config.infoGapMs)
+          : 0,
+        signal,
+        'Friend ratings',
+      );
 
       if (signal.aborted || epoch !== this.epoch || tracker !== this.tracker) {
         return;
@@ -804,7 +842,12 @@ export class OnlineFriendsPoller {
       let handles: string[];
 
       if (mode === 'full') {
-        const friends = await this.api.fetchFriends(signal);
+        const friends = await withDeadline(
+          this.api.fetchFriends(signal),
+          this.config.friendsTimeoutMs,
+          signal,
+          'Friends page',
+        );
 
         if (signal.aborted) {
           return;
@@ -1109,7 +1152,18 @@ export class OnlineFriendsPoller {
         this.lastInfoAt = Date.now();
 
         try {
-          tracker.applyInfo(needed, await this.api.fetchInfo(needed));
+          /* No abort signal here on purpose: a finished lookup is still applied. */
+          tracker.applyInfo(
+            needed,
+            await withDeadline(
+              this.api.fetchInfo(needed),
+              this.config.infoTimeoutMs > 0
+                ? this.config.infoTimeoutMs + this.config.infoGapMs
+                : 0,
+              undefined,
+              'Friend ratings',
+            ),
+          );
         } catch {
           tracker.applyInfo(needed, null);
         }
