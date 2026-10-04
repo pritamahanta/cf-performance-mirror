@@ -22,6 +22,7 @@ export interface SavedSettings {
   customContestFrom?: string;
   customContestTo?: string;
   friendsVisible?: boolean;
+  friendsExpanded?: boolean;
 }
 
 export interface ExtensionSettings {
@@ -43,6 +44,7 @@ export interface ExtensionSettings {
   customContestFrom: string;
   customContestTo: string;
   friendsVisible: boolean;
+  friendsExpanded: boolean;
 }
 
 export const CATEGORIES: Category[] = ['Div1', 'Div2', 'Div3', 'Div4', 'Other'];

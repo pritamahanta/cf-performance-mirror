@@ -20,6 +20,7 @@ The Online Friends panel is a separate, **opt-in** feature (off by default) that
 ## Where it appears
 - The performance panel is injected into Codeforces profile pages (URLs matching `https://codeforces.com/profile/*`).
 - The Online Friends panel, once turned on, appears site-wide on `codeforces.com` pages that have a sidebar, not only profile pages.
+- The Online Friends panel is switched on and off with the people-icon button in the performance panel on your profile page. While that is off, the panel is not shown anywhere and makes no requests. While it is on, the chevron in the panel's own header opens and closes it; a closed panel shows only its header and also makes no requests.
 
 ## Privacy & security 🛡️
 - No server operated by the developer, no tracking, no ads — nothing is uploaded anywhere.

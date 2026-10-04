@@ -12,8 +12,19 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
    * existing user who updates has no `friendsVisible` key saved yet, so
    * they fall through to this default too (see normalizeSettings below)
    * - it must opt them in explicitly, not turn this on for them silently.
+   *
+   * This is the master switch (the people-icon button in the profile page's
+   * controls): while it is off the Online Friends box is not rendered at
+   * all and makes no requests.
    */
   friendsVisible: false,
+  /*
+   * The Online Friends box's own open/closed state (its header chevron),
+   * which only matters while the master switch above is on. Closed keeps
+   * the header and makes no requests. Open by default, so turning the
+   * feature on shows the list.
+   */
+  friendsExpanded: true,
 };
 
 export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
@@ -38,5 +49,6 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     customContestFrom: saved.customContestFrom ?? DEFAULT_SETTINGS.customContestFrom,
     customContestTo: saved.customContestTo ?? DEFAULT_SETTINGS.customContestTo,
     friendsVisible: saved.friendsVisible ?? DEFAULT_SETTINGS.friendsVisible,
+    friendsExpanded: saved.friendsExpanded ?? DEFAULT_SETTINGS.friendsExpanded,
   };
 }

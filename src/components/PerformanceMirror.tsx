@@ -204,31 +204,37 @@ export function PerformanceMirror({
   ]);
 
   /*
-   * friendsVisible can now also be toggled from the
-   * Online Friends box's own button, in a separate
-   * React root that saves straight to storage. Without
-   * this, this panel's own local `settings` copy would
-   * go stale after that - and the next change made
-   * here (even an unrelated one, like the category)
-   * would silently write the stale value back,
-   * clobbering the Online Friends box's toggle.
+   * friendsExpanded is toggled from the Online Friends
+   * box's own chevron, in a separate React root that
+   * saves straight to storage. Without this, this
+   * panel's own local `settings` copy would go stale
+   * after that - and the next change made here (even an
+   * unrelated one, like the category) would silently
+   * write the stale value back, clobbering the box's
+   * own open/closed state. friendsVisible (the master
+   * switch) is kept in the same sync so the two can
+   * never drift apart.
    */
   useEffect(() => {
     const sync = () => {
       const fresh =
         normalizeSettings(
           loadSettings(),
-        ).friendsVisible;
+        );
 
       setSettings(
         current =>
           current.friendsVisible ===
-          fresh
+            fresh.friendsVisible &&
+          current.friendsExpanded ===
+            fresh.friendsExpanded
             ? current
             : {
                 ...current,
                 friendsVisible:
-                  fresh,
+                  fresh.friendsVisible,
+                friendsExpanded:
+                  fresh.friendsExpanded,
               },
       );
     };

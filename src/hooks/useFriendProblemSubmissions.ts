@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -47,10 +48,17 @@ export const MAX_FRIENDS_CHECKED = 30;
  * requests at all. Calls are queued one at a time by the
  * service layer, and results arrive progressively; the
  * friends list itself never waits on them.
+ *
+ * Nothing runs while `active` is false either, and turning
+ * it off cancels every call still queued or in flight (the
+ * queue holds up to MAX_FRIENDS_CHECKED of them, spaced out
+ * over several seconds, so merely ignoring their results
+ * would still send them).
  */
 export function useFriendProblemSubmissions(
   problem: ProblemRef | null,
   handles: readonly string[],
+  active: boolean,
 ): Record<string, FriendProblemEntry> {
   const [entries, setEntries] =
     useState<
@@ -84,8 +92,51 @@ export function useFriendProblemSubmissions(
       )
       .join('\n');
 
+  /*
+   * One AbortController per period in which `active` is
+   * true. Declared before the effect below so that, in the
+   * same commit, it has already been created when that
+   * effect reads it. A change of friends does not abort
+   * it: calls already queued for friends who are still
+   * online are kept and shared, as before.
+   */
+  const controllerRef =
+    useRef<AbortController | null>(
+      null,
+    );
+
   useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const controller =
+      new AbortController();
+
+    controllerRef.current =
+      controller;
+
+    return () => {
+      controller.abort();
+
+      if (
+        controllerRef.current ===
+        controller
+      ) {
+        controllerRef.current =
+          null;
+      }
+    };
+  }, [active]);
+
+  useEffect(() => {
+    const signal =
+      controllerRef.current
+        ?.signal;
+
     if (
+      !active ||
+      !signal ||
       contestId === null ||
       handlesKey === ''
     ) {
@@ -115,6 +166,7 @@ export function useFriendProblemSubmissions(
       loadFriendContestSubmissions(
         contestId,
         handle,
+        signal,
       )
         .then(submissions => {
           if (cancelled) {
@@ -152,7 +204,7 @@ export function useFriendProblemSubmissions(
     return () => {
       cancelled = true;
     };
-  }, [contestId, handlesKey]);
+  }, [active, contestId, handlesKey]);
 
   return entries;
 }

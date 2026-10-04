@@ -123,12 +123,16 @@ export async function fetchUserDataset(
  */
 const pacedApi =
   createPacedApiClient({
-    fetchJson: async path => {
+    fetchJson: async (
+      path,
+      signal,
+    ) => {
       const response =
         await fetch(
           `${API_BASE}${path}`,
           {
             cache: 'no-store',
+            signal,
           },
         );
 
@@ -140,6 +144,19 @@ const pacedApi =
           await response.json();
       } catch {
         body = null;
+      }
+
+      /*
+       * Aborted while the body was still downloading:
+       * report that, not a misleading "HTTP <status>".
+       */
+      if (signal?.aborted) {
+        throw (
+          signal.reason ??
+          new Error(
+            'Request aborted',
+          )
+        );
       }
 
       if (
@@ -165,6 +182,7 @@ const pacedApi =
 export async function fetchContestSubmissionsByHandle(
   contestId: number,
   handle: string,
+  signal?: AbortSignal,
 ): Promise<
   CodeforcesSubmission[]
 > {
@@ -173,6 +191,7 @@ export async function fetchContestSubmissionsByHandle(
       CodeforcesSubmission[]
     >(
       `/contest.status?contestId=${contestId}&handle=${encodeURIComponent(handle)}`,
+      signal,
     );
 
   return Array.isArray(

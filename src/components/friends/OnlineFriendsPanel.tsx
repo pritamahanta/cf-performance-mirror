@@ -33,7 +33,7 @@ import {
 } from '../../hooks/useOnlineFriends';
 
 import {
-  toggleFriendsVisible,
+  toggleFriendsExpanded,
 } from '../../services/storage';
 
 import {
@@ -236,8 +236,21 @@ function ChevronIcon() {
 }
 
 export function OnlineFriendsPanel() {
-  const visible =
+  const {
+    enabled,
+    expanded,
+  } =
     useFriendsVisible();
+
+  /*
+   * Everything that talks to Codeforces (the friends
+   * poller and the per-problem submission lookups) runs
+   * only while the feature is on AND the box is open.
+   * Turning it off, or closing the box, stops them.
+   */
+  const active =
+    enabled &&
+    expanded;
 
   const {
     state,
@@ -245,7 +258,7 @@ export function OnlineFriendsPanel() {
     refresh,
   } =
     useOnlineFriends(
-      visible,
+      active,
     );
 
   /*
@@ -281,6 +294,7 @@ export function OnlineFriendsPanel() {
     useFriendProblemSubmissions(
       problem,
       friendHandles,
+      active,
     );
 
   const [openFriend, setOpenFriend] =
@@ -305,7 +319,7 @@ export function OnlineFriendsPanel() {
     }
 
     const stillListed =
-      visible &&
+      active &&
       state.status ===
         'ready' &&
       state.friends.some(
@@ -318,7 +332,7 @@ export function OnlineFriendsPanel() {
       setOpenFriend(null);
     }
   }, [
-    visible,
+    active,
     state,
     openFriend,
   ]);
@@ -368,6 +382,15 @@ export function OnlineFriendsPanel() {
       : '\u00a0';
 
   /*
+   * Master switch off: render nothing at all - not even
+   * the closed header. Placed after every hook above so
+   * the hooks still run in the same order on each render.
+   */
+  if (!enabled) {
+    return null;
+  }
+
+  /*
    * Structure mirrors Codeforces' own sidebar
    * boxes exactly (verified live against the
    * "Top contributors" box on codeforces.com):
@@ -400,43 +423,43 @@ export function OnlineFriendsPanel() {
           id="cfpm-friends-chevron-btn"
           type="button"
           className={
-            visible
+            expanded
               ? ''
               : 'collapsed'
           }
           title={
-            visible
+            expanded
               ? 'Hide online friends'
               : 'Show online friends'
           }
           aria-label={
-            visible
+            expanded
               ? 'Hide online friends'
               : 'Show online friends'
           }
           aria-expanded={
-            visible
+            expanded
           }
           onClick={() => {
             /*
-             * Reads the full saved settings fresh from
-             * storage, flips just this one flag, and
-             * writes the whole object back - never a
-             * partial patch, since saveSettings()
-             * overwrites storage with exactly what it's
-             * given. Dispatches the same event
-             * useFriendsVisible() and the profile page's
-             * Controls panel both already listen for, so
-             * every surface stays in sync.
+             * Flips only the box's own open/closed flag
+             * (never the master switch, which belongs to
+             * the profile page's controls). Reads the full
+             * saved settings fresh from storage and writes
+             * the whole object back - never a partial
+             * patch, since saveSettings() overwrites
+             * storage with exactly what it's given - and
+             * dispatches the event useFriendsVisible() and
+             * the profile page's controls both listen for.
              */
-            toggleFriendsVisible();
+            toggleFriendsExpanded();
           }}
         >
           <ChevronIcon />
         </button>
       </div>
 
-      {visible && (
+      {expanded && (
         <>
       {state.status ===
         'loading' && (

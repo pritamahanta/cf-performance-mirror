@@ -43,6 +43,17 @@ export function toggleFriendsVisible(storage: Storage = localStorage): boolean {
   return next.friendsVisible;
 }
 
+/*
+ * Same as toggleFriendsVisible, for `friendsExpanded` (the Online
+ * Friends box's own open/closed chevron). Returns the new value.
+ */
+export function toggleFriendsExpanded(storage: Storage = localStorage): boolean {
+  const next = normalizeSettings(loadSettings(storage));
+  next.friendsExpanded = !next.friendsExpanded;
+  saveSettings(next, storage);
+  return next.friendsExpanded;
+}
+
 export function loadToggle(storage: Storage = localStorage): boolean {
   try {
     const value = storage.getItem(TOGGLE_KEY);
