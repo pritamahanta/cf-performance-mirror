@@ -13,15 +13,18 @@ Analyse your Codeforces profile — solve times, WA% by topic and problem, divis
 Analyze overall performance, solve time, failure rates, rating changes, and errors by division and time range. Track your Codeforces performance with clear insights into solve times, failure rates, rating changes, and problem-level errors, broken down by division and time range. Filter by contest type and focus on selected topics or rating ranges to quickly spot weak areas and improve efficiently, all directly on your profile page.
 
 ## How it works
-Runs entirely client-side on `codeforces.com/profile/<handle>`. Fetches from three public Codeforces APIs (`user.status`, `contest.list`, `user.rating`). No server, no tracking — all computation happens in your browser.
+The performance panel runs entirely client-side on `codeforces.com/profile/<handle>`. It fetches from public Codeforces APIs (`user.status`, `contest.list`, `user.rating`, `user.info`). No login needed, no server, no tracking.
+
+The Online Friends panel is a separate, **opt-in** feature (off by default) that shows which of your Codeforces friends are online. Turning it on requires being logged in to Codeforces: it reads your own `https://codeforces.com/friends` page using your browser's existing session, then checks each friend's public profile page for "Last visit: online now". The resulting friend list and online status are kept in your browser's `localStorage` so the panel doesn't refetch everything on every page. See `PRIVACY_POLICY.md` for details.
 
 ## Where it appears
-- Injected into Codeforces profile pages (URLs matching `https://codeforces.com/profile/*` and subdomains).
-- The panel appears as a compact card near existing profile boxes / page content.
+- The performance panel is injected into Codeforces profile pages (URLs matching `https://codeforces.com/profile/*`).
+- The Online Friends panel, once turned on, appears site-wide on `codeforces.com` pages that have a sidebar, not only profile pages.
 
 ## Privacy & security 🛡️
-- No login required, no tracking, no backend — nothing is uploaded to any server.
-- Uses only public Codeforces APIs from your browser (reads public profile/submission data).
+- No server operated by the developer, no tracking, no ads — nothing is uploaded anywhere.
+- The performance panel uses only public Codeforces APIs and needs no login.
+- The Online Friends panel is opt-in and, once turned on, uses your existing Codeforces login session to read your own friends page; it never sees or stores your password or session token, only the resulting friend list and online status (kept in `localStorage` on your device).
 - Requires host permission for Codeforces domains to fetch data directly.
 - Inspect the source before installing if you want to verify behavior — the codebase is small and self-contained.
 

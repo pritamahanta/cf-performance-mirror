@@ -6,7 +6,14 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   hideAC: false, hideTags: false, hideRatings: false, solvedOnly: false,
   minAttempts: 1, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
   tagFilters: [], tableVisible: true, customContestFrom: '', customContestTo: '',
-  friendsVisible: true,
+  /*
+   * Off by default: it reads the user's own authenticated /friends page
+   * (see fetchOnlineFriends) and stores the result in localStorage. An
+   * existing user who updates has no `friendsVisible` key saved yet, so
+   * they fall through to this default too (see normalizeSettings below)
+   * - it must opt them in explicitly, not turn this on for them silently.
+   */
+  friendsVisible: false,
 };
 
 export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
