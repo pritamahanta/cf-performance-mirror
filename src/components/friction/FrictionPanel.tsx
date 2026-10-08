@@ -73,13 +73,21 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
     return () => document.removeEventListener('click', handler, true);
   }, [openMenu, topicPickerOpen]);
 
+  /*
+   * The view menu and the topic picker are taller than the room left
+   * inside the card, so while either is open the clipping on the card
+   * and its body is lifted; otherwise their bottom edge (the picker's
+   * Done button, in particular) gets cut off.
+   */
+  const overflowOpen = openMenu === 'view' || topicPickerOpen;
+
   useEffect(() => {
     const body = document.getElementById('cfpm-body');
-    if (body) body.style.overflow = openMenu === 'view' ? 'visible' : 'hidden';
+    if (body) body.style.overflow = overflowOpen ? 'visible' : 'hidden';
     return () => {
       if (body) body.style.overflow = 'hidden';
     };
-  }, [openMenu]);
+  }, [overflowOpen]);
 
   const getProblems = (which: FrictionSource) => getFrictionProblems(modeData, category, which);
   const filters: FrictionFilters = {
@@ -134,7 +142,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
       <div
         className="cfpm-friction-scrollbox"
         style={{
-          overflow: openMenu === 'view' ? 'visible' : 'hidden',
+          overflow: overflowOpen ? 'visible' : 'hidden',
           border: `1px solid ${theme.borderLight}`,
           borderRadius: 5,
           display: 'flex',
@@ -212,6 +220,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
                   availableTags={availableTags}
                   selected={settings.tagFilters}
                   onToggle={toggleTag}
+                  onClear={() => setPatch({ tagFilters: [] })}
                   onDone={() => { setTopicPickerOpen(false); setOpenMenu('filter'); setSearch(''); }}
                   onEscape={() => { setTopicPickerOpen(false); setOpenMenu('filter'); setSearch(''); }}
                 />
@@ -499,9 +508,9 @@ function ViewMenu({ settings, theme, onChange }: { settings: ExtensionSettings; 
   );
 }
 
-function TopicPicker({ theme, search, setSearch, tags, availableTags, selected, onToggle, onDone, onEscape }: {
+function TopicPicker({ theme, search, setSearch, tags, availableTags, selected, onToggle, onClear, onDone, onEscape }: {
   theme: Theme; search: string; setSearch: (value: string) => void; tags: string[]; availableTags: string[];
-  selected: string[]; onToggle: (tag: string) => void; onDone: () => void; onEscape: () => void;
+  selected: string[]; onToggle: (tag: string) => void; onClear: () => void; onDone: () => void; onEscape: () => void;
 }) {
   return (
     <div id="cfpm-topic-picker" style={{
@@ -552,7 +561,16 @@ function TopicPicker({ theme, search, setSearch, tags, availableTags, selected, 
         padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 8, flexShrink: 0,
       }}>
-        <span style={{ fontSize: 11, color: theme.muted }}>{selected.length ? `${selected.length} selected` : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 11, color: theme.muted }}>{selected.length ? `${selected.length} selected` : ''}</span>
+          {selected.length > 0 && (
+            <button
+              id="cfpm-topic-clear"
+              style={{ fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', padding: 0, outline: 'none', color: theme.accentBlue }}
+              onClick={e => { e.stopPropagation(); onClear(); }}
+            >Clear</button>
+          )}
+        </div>
         <button className="cfpm-pill-btn" style={{
           background: theme.btnActiveBg, color: theme.btnActiveText, border: `1px solid ${theme.btnActiveBorder}`,
           cursor: 'pointer', fontSize: 11, height: 26, padding: '0 14px', borderRadius: 4, fontWeight: 700,
