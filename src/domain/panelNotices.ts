@@ -15,10 +15,6 @@ export const INCOMPLETE_NOTE =
 export const SLOW_SCAN_NOTE =
   'Large friend list: someone who just came online can take several minutes to appear, and short visits may be missed.';
 
-export function solvedLimitNote(limit: number): string {
-  return `Solved marks are checked for the first ${limit} online friends only.`;
-}
-
 /* What to show instead of the list when it is empty. */
 export function emptyListMessage(noFriends: boolean): string {
   return noFriends ? NO_FRIENDS_MESSAGE : NONE_ONLINE_MESSAGE;
@@ -27,15 +23,6 @@ export function emptyListMessage(noFriends: boolean): string {
 export interface NoteInput {
   incomplete: boolean;
   slowScan: boolean;
-
-  /* A problem page with the solved-marker feature active. */
-  onProblemPage: boolean;
-
-  /* Online friends currently listed. */
-  listedCount: number;
-
-  /* How many of them get a solved marker. */
-  solvedLimit: number;
 }
 
 /* The small notes under the list, in display order. */
@@ -50,9 +37,41 @@ export function listNotes(input: NoteInput): string[] {
     notes.push(SLOW_SCAN_NOTE);
   }
 
-  if (input.onProblemPage && input.listedCount > input.solvedLimit) {
-    notes.push(solvedLimitNote(input.solvedLimit));
+  return notes;
+}
+
+export interface SolvedLimitInput {
+  /* A problem page with the solved-marker feature active. */
+  onProblemPage: boolean;
+
+  /* Online friends currently listed. */
+  listedCount: number;
+
+  /* How many of them, from the top, are being checked now. */
+  checkedLimit: number;
+
+  /* How many more one click adds at most. */
+  batchSize: number;
+}
+
+export interface SolvedLimitInfo {
+  text: string;
+
+  /* How many friends the next click will add to the check. */
+  nextBatch: number;
+}
+
+/*
+ * Set only when some listed friends are not being checked for solved
+ * marks; null when every listed friend is covered (or off a problem page).
+ */
+export function solvedLimitInfo(input: SolvedLimitInput): SolvedLimitInfo | null {
+  if (!input.onProblemPage || input.listedCount <= input.checkedLimit) {
+    return null;
   }
 
-  return notes;
+  return {
+    text: `Solved marks are checked for the first ${input.checkedLimit} of ${input.listedCount} online friends.`,
+    nextBatch: Math.min(input.batchSize, input.listedCount - input.checkedLimit),
+  };
 }

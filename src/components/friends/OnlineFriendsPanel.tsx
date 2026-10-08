@@ -32,6 +32,7 @@ import {
 import {
   emptyListMessage,
   listNotes,
+  solvedLimitInfo,
 } from '../../domain/panelNotices';
 
 import {
@@ -296,12 +297,32 @@ export function OnlineFriendsPanel() {
       [state],
     );
 
-  const submissionEntries =
+  const {
+    entries: submissionEntries,
+    limit: solvedLimit,
+    checkMore: checkMoreSolved,
+  } =
     useFriendProblemSubmissions(
       problem,
       friendHandles,
       active,
     );
+
+  const solvedInfo =
+    state.status ===
+    'ready'
+      ? solvedLimitInfo({
+          onProblemPage:
+            problem !== null,
+          listedCount:
+            state.friends
+              .length,
+          checkedLimit:
+            solvedLimit,
+          batchSize:
+            MAX_FRIENDS_CHECKED,
+        })
+      : null;
 
   const [openFriend, setOpenFriend] =
     useState<{
@@ -698,13 +719,6 @@ export function OnlineFriendsPanel() {
             state.incomplete,
           slowScan:
             state.slowScan,
-          onProblemPage:
-            problem !== null,
-          listedCount:
-            state.friends
-              .length,
-          solvedLimit:
-            MAX_FRIENDS_CHECKED,
         }).map(note => (
           <div
             key={note}
@@ -721,6 +735,49 @@ export function OnlineFriendsPanel() {
             {note}
           </div>
         ))}
+
+      {solvedInfo && (
+        <div
+          style={{
+            padding:
+              '0.25em 1em',
+            fontSize:
+              '0.85em',
+            textAlign:
+              'center',
+          }}
+        >
+          <span
+            style={{
+              opacity: 0.7,
+            }}
+          >
+            {solvedInfo.text}
+          </span>{' '}
+          <button
+            type="button"
+            onClick={
+              checkMoreSolved
+            }
+            title={`Sends ${solvedInfo.nextBatch} more Codeforces requests, about one every 2 seconds`}
+            style={{
+              background:
+                'none',
+              border: 'none',
+              padding: 0,
+              font: 'inherit',
+              color:
+                'inherit',
+              textDecoration:
+                'underline',
+              cursor:
+                'pointer',
+            }}
+          >
+            {`Check next ${solvedInfo.nextBatch}`}
+          </button>
+        </div>
+      )}
 
       <div className="cfpm-friends-footer">
         <div className="cfpm-friends-footer-group">

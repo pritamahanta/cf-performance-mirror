@@ -34,9 +34,22 @@ export type FriendProblemEntry =
  * Safety valve: with a very large number of online
  * friends, only the first few are checked, so opening a
  * problem page can never turn into an unbounded burst of
- * API calls.
+ * API calls. This is also the batch size: the panel
+ * offers a button that raises the limit by this many
+ * (see `checkMore`), so every extra request is something
+ * the user asked for.
  */
 export const MAX_FRIENDS_CHECKED = 30;
+
+export interface FriendProblemSubmissions {
+  entries: Record<string, FriendProblemEntry>;
+
+  /* How many friends, counted from the top of the list, are being checked. */
+  limit: number;
+
+  /* Raises the limit by one batch (MAX_FRIENDS_CHECKED). */
+  checkMore: () => void;
+}
 
 /*
  * For each given (online) friend, loads their submissions
@@ -51,15 +64,22 @@ export const MAX_FRIENDS_CHECKED = 30;
  *
  * Nothing runs while `active` is false either, and turning
  * it off cancels every call still queued or in flight (the
- * queue holds up to MAX_FRIENDS_CHECKED of them, spaced out
- * over several seconds, so merely ignoring their results
- * would still send them).
+ * queue holds up to `limit` of them, spaced out over
+ * several seconds, so merely ignoring their results would
+ * still send them).
  */
 export function useFriendProblemSubmissions(
   problem: ProblemRef | null,
   handles: readonly string[],
   active: boolean,
-): Record<string, FriendProblemEntry> {
+): FriendProblemSubmissions {
+  const [batches, setBatches] =
+    useState(1);
+
+  const limit =
+    MAX_FRIENDS_CHECKED *
+    batches;
+
   const [entries, setEntries] =
     useState<
       Record<
@@ -88,7 +108,7 @@ export function useFriendProblemSubmissions(
     )
       .slice(
         0,
-        MAX_FRIENDS_CHECKED,
+        limit,
       )
       .join('\n');
 
@@ -206,5 +226,14 @@ export function useFriendProblemSubmissions(
     };
   }, [active, contestId, handlesKey]);
 
-  return entries;
+  return {
+    entries,
+    limit,
+    checkMore: () => {
+      setBatches(
+        current =>
+          current + 1,
+      );
+    },
+  };
 }

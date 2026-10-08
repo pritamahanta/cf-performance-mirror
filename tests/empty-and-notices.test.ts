@@ -12,7 +12,7 @@ import {
   SLOW_SCAN_NOTE,
   emptyListMessage,
   listNotes,
-  solvedLimitNote,
+  solvedLimitInfo,
 } from '../src/domain/panelNotices.ts';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -186,22 +186,31 @@ test('notices: the incomplete note no longer claims a last known status', () => 
   assert.match(INCOMPLETE_NOTE, /missing/);
 });
 
-test('notices: solved-marker limit is announced only on a problem page with more friends than the limit', () => {
-  const base = { incomplete: false, slowScan: false, solvedLimit: 30 };
+test('notices: the solved-marker limit shows only on a problem page with unchecked friends', () => {
+  const base = { onProblemPage: true, batchSize: 30 };
 
-  assert.deepEqual(listNotes({ ...base, onProblemPage: true, listedCount: 30 }), []);
-  assert.deepEqual(listNotes({ ...base, onProblemPage: true, listedCount: 31 }), [solvedLimitNote(30)]);
-  assert.deepEqual(listNotes({ ...base, onProblemPage: false, listedCount: 500 }), []);
-  assert.match(solvedLimitNote(30), /first 30 online friends/);
+  assert.equal(solvedLimitInfo({ ...base, listedCount: 30, checkedLimit: 30 }), null, 'everyone covered');
+  assert.equal(solvedLimitInfo({ ...base, listedCount: 12, checkedLimit: 30 }), null, 'fewer than the limit');
+  assert.equal(solvedLimitInfo({ ...base, onProblemPage: false, listedCount: 500, checkedLimit: 30 }), null, 'not a problem page');
+
+  const info = solvedLimitInfo({ ...base, listedCount: 100, checkedLimit: 30 });
+  assert.deepEqual(info, {
+    text: 'Solved marks are checked for the first 30 of 100 online friends.',
+    nextBatch: 30,
+  });
 });
 
-test('notices: every applicable note is listed, in order', () => {
-  assert.deepEqual(
-    listNotes({ incomplete: true, slowScan: true, onProblemPage: true, listedCount: 40, solvedLimit: 30 }),
-    [INCOMPLETE_NOTE, SLOW_SCAN_NOTE, solvedLimitNote(30)],
+test('notices: the next batch never promises more friends than are left', () => {
+  const info = solvedLimitInfo({ onProblemPage: true, listedCount: 45, checkedLimit: 30, batchSize: 30 });
+  assert.equal(info?.nextBatch, 15);
+  assert.equal(
+    solvedLimitInfo({ onProblemPage: true, listedCount: 45, checkedLimit: 60, batchSize: 30 }),
+    null,
+    'once the limit passes the list, the note goes away',
   );
-  assert.deepEqual(
-    listNotes({ incomplete: false, slowScan: false, onProblemPage: true, listedCount: 3, solvedLimit: 30 }),
-    [],
-  );
+});
+
+test('notices: every applicable list note is shown, in order', () => {
+  assert.deepEqual(listNotes({ incomplete: true, slowScan: true }), [INCOMPLETE_NOTE, SLOW_SCAN_NOTE]);
+  assert.deepEqual(listNotes({ incomplete: false, slowScan: false }), []);
 });
