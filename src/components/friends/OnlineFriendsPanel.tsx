@@ -25,8 +25,14 @@ import {
 } from '../../hooks/useFriendsVisible';
 
 import {
+  MAX_FRIENDS_CHECKED,
   useFriendProblemSubmissions,
 } from '../../hooks/useFriendProblemSubmissions';
+
+import {
+  emptyListMessage,
+  listNotes,
+} from '../../domain/panelNotices';
 
 import {
   useOnlineFriends,
@@ -504,7 +510,9 @@ export function OnlineFriendsPanel() {
               'center',
           }}
         >
-          No friends online right now.
+          {emptyListMessage(
+            state.noFriends,
+          )}
         </div>
       )}
 
@@ -685,8 +693,21 @@ export function OnlineFriendsPanel() {
 
       {state.status ===
         'ready' &&
-        state.incomplete && (
+        listNotes({
+          incomplete:
+            state.incomplete,
+          slowScan:
+            state.slowScan,
+          onProblemPage:
+            problem !== null,
+          listedCount:
+            state.friends
+              .length,
+          solvedLimit:
+            MAX_FRIENDS_CHECKED,
+        }).map(note => (
           <div
+            key={note}
             style={{
               padding:
                 '0.25em 1em',
@@ -697,9 +718,9 @@ export function OnlineFriendsPanel() {
                 'center',
             }}
           >
-            {"Some friends couldn't be checked \u2014 showing their last known status."}
+            {note}
           </div>
-        )}
+        ))}
 
       <div className="cfpm-friends-footer">
         <div className="cfpm-friends-footer-group">

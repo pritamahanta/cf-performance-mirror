@@ -30,9 +30,20 @@ export type PollerState =
 
       /*
        * True when the last full scan could not check a noticeable
-       * share of friends; those keep their last known status.
+       * share of friends. Only friends confirmed online within
+       * ONLINE_TTL_MS are listed, so anyone who could not be checked
+       * may be online without being shown.
        */
       incomplete: boolean;
+
+      /* The friends page was read successfully and has no friends on it. */
+      noFriends: boolean;
+
+      /*
+       * The last full scan took at least `slowScanNoticeMs`, so a friend
+       * who just came online can take a while to show up.
+       */
+      slowScan: boolean;
       refreshing: boolean;
     }
   | {
@@ -162,6 +173,9 @@ export interface PollerConfig {
 
   /* Show "incomplete" when at least this share of a full scan failed. */
   incompleteShare: number;
+
+  /* Flag the list as slow to notice new arrivals when a full scan takes this long. */
+  slowScanNoticeMs: number;
 }
 
 export const DEFAULT_POLLER_CONFIG: PollerConfig = {
@@ -192,6 +206,7 @@ export const DEFAULT_POLLER_CONFIG: PollerConfig = {
   poolBreakerLimit: 15,
   poolRequestTimeoutMs: 20_000,
   incompleteShare: 0.05,
+  slowScanNoticeMs: 5 * 60_000,
 };
 
 const LOAD_ERROR_MESSAGE =
@@ -1203,6 +1218,10 @@ export class OnlineFriendsPoller {
         updatedAt: this.updatedAt || Date.now(),
         progress,
         incomplete: this.incomplete,
+        noFriends: this.tracker.friendCount() === 0,
+        slowScan:
+          this.lastFullDurationMs > 0 &&
+          this.lastFullDurationMs >= this.config.slowScanNoticeMs,
         refreshing,
       };
     }

@@ -42,8 +42,14 @@ export type OnlineFriendsState =
       updatedAt: number;
       progress: Progress | null;
 
-      /* Some friends could not be checked; they show their last known status. */
+      /* Some friends could not be checked, so the list may be missing online friends. */
       incomplete: boolean;
+
+      /* The friends page has no friends on it. */
+      noFriends: boolean;
+
+      /* A full scan takes minutes, so new arrivals can take a while to appear. */
+      slowScan: boolean;
     }
   | {
       status: 'error';
@@ -122,6 +128,10 @@ function toPanelState(
           state.progress,
         incomplete:
           state.incomplete,
+        noFriends:
+          state.noFriends,
+        slowScan:
+          state.slowScan,
       };
   }
 }

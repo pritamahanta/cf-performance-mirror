@@ -24,6 +24,7 @@ import {
 } from '../domain/profileLocales';
 
 import { withDeadline } from './deadline';
+import { getLoggedInHandle } from './onlineStore';
 
 const API_BASE =
   'https://codeforces.com/api';
@@ -210,6 +211,19 @@ export async function fetchContestSubmissionsByHandle(
     : [];
 }
 
+/*
+ * True when the fetched page itself shows a logged-in header. Used to
+ * tell "you have no friends" from "you are not logged in": a logged-out
+ * page has no friends table either, but no logged-in header.
+ */
+function pageShowsLoggedIn(doc: Document): boolean {
+  try {
+    return getLoggedInHandle(doc) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /* Longest the friends page may take, request and body together. */
 const FRIENDS_PAGE_TIMEOUT_MS =
   20_000;
@@ -362,6 +376,11 @@ export async function fetchOnlineFriends(
     tables[0]?.table;
 
   if (!friendsTable) {
+    /* Logged in but nothing to list: an empty list, not an error. */
+    if (pageShowsLoggedIn(doc)) {
+      return [];
+    }
+
     throw new Error(
       "Couldn't find your Codeforces friends table. Make sure you're logged in.",
     );
@@ -395,6 +414,10 @@ export async function fetchOnlineFriends(
     );
 
   if (handles.length === 0) {
+    if (pageShowsLoggedIn(doc)) {
+      return [];
+    }
+
     throw new Error(
       "Couldn't find any friends on your Codeforces friends page.",
     );
