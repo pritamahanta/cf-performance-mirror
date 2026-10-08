@@ -123,6 +123,15 @@ export async function fetchUserDataset(
  */
 const pacedApi =
   createPacedApiClient({
+    /*
+     * Start at the documented pace (one call per two
+     * seconds) instead of probing with shorter gaps,
+     * which exceeded the documented limit. user.info
+     * calls from the background worker share the same
+     * quota.
+     */
+    fastGapMs: 2_100,
+    slowGapMs: 2_100,
     fetchJson: async (
       path,
       signal,
