@@ -159,6 +159,21 @@ export function FriendSubmissionsPopup({
   const [openedSubmission, setOpenedSubmission] =
     useState<FriendSubmission | null>(null);
 
+  /*
+   * Read inside the outside-click/scroll/resize effect below without
+   * being a dependency of it (see its comment: re-subscribing those
+   * listeners every time the source overlay opens or closes would be
+   * unnecessary churn). Kept in sync on every render, same as the
+   * value it guards.
+   */
+  const openedSubmissionRef =
+    useRef<FriendSubmission | null>(
+      null,
+    );
+
+  openedSubmissionRef.current =
+    openedSubmission;
+
   const theme =
     useTheme();
 
@@ -348,6 +363,22 @@ export function FriendSubmissionsPopup({
       event: MouseEvent,
     ) => {
       /*
+       * The source overlay (SubmissionSourceOverlay) is a sibling
+       * portal, not a child of popupRef - it is not "inside" the
+       * popup by any DOM check, so while it is open this listener
+       * must do nothing at all. Otherwise clicking anything inside
+       * it (the Copy button, the code itself, its own backdrop)
+       * would be seen as a click "outside" this popup and close it
+       * - taking the overlay down with it, since openedSubmission
+       * lives in this component's own state.
+       */
+      if (
+        openedSubmissionRef.current
+      ) {
+        return;
+      }
+
+      /*
        * Clicks on the button itself are handled by the
        * button (it toggles the popup). contains() rather
        * than ===, because the click usually lands on the
@@ -374,6 +405,21 @@ export function FriendSubmissionsPopup({
     const onScroll = (
       event: Event,
     ) => {
+      /*
+       * Same reasoning as onDocumentClick: scrolling inside the
+       * overlay's own scrollable code view dispatches a (non-
+       * bubbling) scroll event whose target is never inside
+       * popupRef, but this capture-phase window listener still
+       * sees it. Without this guard, scrolling the source code
+       * closes the popup underneath it and the overlay with it -
+       * exactly the "scrolling closes it" bug.
+       */
+      if (
+        openedSubmissionRef.current
+      ) {
+        return;
+      }
+
       if (
         !isInside(
           popupRef.current,
@@ -388,11 +434,32 @@ export function FriendSubmissionsPopup({
       event: KeyboardEvent,
     ) => {
       if (
+        openedSubmissionRef.current
+      ) {
+        /*
+         * The overlay has its own Escape handler (it closes
+         * itself, leaving this popup open underneath, same as a
+         * real dialog). Acting here too would close both at once.
+         */
+        return;
+      }
+
+      if (
         event.key ===
         'Escape'
       ) {
         onClose();
       }
+    };
+
+    const onResize = () => {
+      if (
+        openedSubmissionRef.current
+      ) {
+        return;
+      }
+
+      onClose();
     };
 
     document.addEventListener(
@@ -416,7 +483,7 @@ export function FriendSubmissionsPopup({
 
     window.addEventListener(
       'resize',
-      onClose,
+      onResize,
     );
 
     return () => {
@@ -438,7 +505,7 @@ export function FriendSubmissionsPopup({
 
       window.removeEventListener(
         'resize',
-        onClose,
+        onResize,
       );
     };
   }, [anchor, onClose]);

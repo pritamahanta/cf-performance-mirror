@@ -11,25 +11,38 @@ afterEach(() => {
   (globalThis as { DOMParser?: unknown }).DOMParser = realDomParser;
 });
 
-function installPageWithSource(source: string | null) {
+function installPageWithSource(source: string | null, html?: string) {
   (globalThis as { DOMParser?: unknown }).DOMParser = class {
     parseFromString() {
       return {
         querySelector: (selector: string) =>
           selector === '#program-source-text' && source !== null
-            ? { textContent: source }
+            ? { textContent: source, innerHTML: html ?? source }
             : null,
       };
     }
   };
 }
 
-test('fetchSubmissionSourceText: returns the text of #program-source-text', async () => {
+test('fetchSubmissionSourceText: returns the text of #program-source-text as both html and text', async () => {
   installPageWithSource('#include <bits/stdc++.h>\nint main() {}\n');
   globalThis.fetch = (async () => new Response('<html></html>', { status: 200 })) as typeof fetch;
 
   const source = await fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1');
-  assert.equal(source, '#include <bits/stdc++.h>\nint main() {}\n');
+  assert.equal(source.text, '#include <bits/stdc++.h>\nint main() {}\n');
+  assert.equal(source.html, '#include <bits/stdc++.h>\nint main() {}\n');
+});
+
+test('fetchSubmissionSourceText: keeps the element\'s own innerHTML (syntax-highlighting markup) separately from its plain text', async () => {
+  installPageWithSource(
+    '#include <bits/stdc++.h>',
+    '<span class="comment">#include &lt;bits/stdc++.h&gt;</span>',
+  );
+  globalThis.fetch = (async () => new Response('<html></html>', { status: 200 })) as typeof fetch;
+
+  const source = await fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1');
+  assert.equal(source.html, '<span class="comment">#include &lt;bits/stdc++.h&gt;</span>');
+  assert.equal(source.text, '#include <bits/stdc++.h>', 'the Copy button must still get the plain source, not markup');
 });
 
 test('fetchSubmissionSourceText: no such element on the page is a clear error, not empty source', async () => {

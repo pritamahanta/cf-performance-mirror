@@ -49,6 +49,13 @@ export function SubmissionPopup({
   const [position, setPosition] = useState({ top: -9999, left: -9999 });
   const [openedSubmission, setOpenedSubmission] = useState<{ id: number; url: string } | null>(null);
 
+  /*
+   * Read inside the outside-click/scroll effect below without being
+   * a dependency of it. Kept in sync on every render.
+   */
+  const openedSubmissionRef = useRef<{ id: number; url: string } | null>(null);
+  openedSubmissionRef.current = openedSubmission;
+
   const reposition = () => {
     const popup = popupRef.current;
     if (!popup || !document.contains(anchor)) {
@@ -69,10 +76,28 @@ export function SubmissionPopup({
 
   useEffect(() => {
     const onDocumentClick = (event: globalThis.MouseEvent) => {
+      /*
+       * The source overlay (SubmissionSourceOverlay) is a sibling
+       * portal, not a child of popupRef, so while it is open this
+       * must do nothing: otherwise clicking anything inside it (the
+       * Copy button, the code itself, its own backdrop) reads as a
+       * click "outside" this popup and closes it - taking the
+       * overlay down with it, since openedSubmission lives here.
+       */
+      if (openedSubmissionRef.current) return;
       const target = event.target as Node | null;
       if (!popupRef.current || (target !== anchor && !popupRef.current.contains(target))) onClose();
     };
     const onScroll = (event: Event) => {
+      /*
+       * Same reasoning: scrolling inside the overlay's own
+       * scrollable code view dispatches a (non-bubbling) scroll
+       * event whose target is never inside popupRef, but this
+       * capture-phase window listener still sees it. Without this
+       * guard, scrolling the source code closes the popup
+       * underneath it and the overlay with it.
+       */
+      if (openedSubmissionRef.current) return;
       if (!popupRef.current?.contains(event.target as Node)) onClose();
     };
     document.addEventListener('click', onDocumentClick);

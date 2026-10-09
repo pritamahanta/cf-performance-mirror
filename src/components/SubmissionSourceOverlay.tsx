@@ -35,7 +35,7 @@ interface Props {
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; source: string }
+  | { status: 'ready'; html: string; text: string }
   | { status: 'error'; message: string };
 
 /*
@@ -75,7 +75,8 @@ export function SubmissionSourceOverlay({
       .then(source => {
         setState({
           status: 'ready',
-          source,
+          html: source.html,
+          text: source.text,
         });
       })
       .catch(error => {
@@ -136,7 +137,7 @@ export function SubmissionSourceOverlay({
 
     navigator.clipboard
       ?.writeText(
-        state.source,
+        state.text,
       )
       .then(() => {
         setCopied(true);
@@ -333,7 +334,7 @@ export function SubmissionSourceOverlay({
             background:
               theme.isDark
                 ? 'rgba(255,255,255,0.03)'
-                : '#f5f5f5',
+                : '#ffffff',
           }}
         >
           {state.status ===
@@ -391,6 +392,19 @@ export function SubmissionSourceOverlay({
 
           {state.status ===
             'ready' && (
+            /*
+             * dangerouslySetInnerHTML, not text: `state.html` is
+             * Codeforces' own innerHTML for #program-source-text,
+             * carrying its own syntax-highlighting spans. Rendered
+             * directly (not re-escaped into plain text) so those
+             * spans keep their class names and pick up Codeforces'
+             * own, already-loaded stylesheet - the same colors the
+             * real "view source" dialog shows, not a guessed
+             * approximation. The source text itself arrives from
+             * Codeforces already HTML-escaped inside those spans
+             * (see fetchSubmissionSourceText), so this never runs
+             * anything from the submitted code itself.
+             */
             <pre
               style={{
                 margin: 0,
@@ -405,9 +419,11 @@ export function SubmissionSourceOverlay({
                 color:
                   theme.text,
               }}
-            >
-              {state.source}
-            </pre>
+              dangerouslySetInnerHTML={{
+                __html:
+                  state.html,
+              }}
+            />
           )}
         </div>
       </div>
