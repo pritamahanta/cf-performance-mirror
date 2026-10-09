@@ -26,6 +26,7 @@ import type {
 } from '../../domain/friendSubmissions';
 
 import { useTheme } from '../../hooks/useTheme';
+import { SubmissionSourceOverlay } from '../SubmissionSourceOverlay';
 
 /*
  * The popup is as wide as its content needs (a row is two short
@@ -133,6 +134,8 @@ interface Position {
 interface Props {
   /* Rendered in the header (the friend's colored handle). */
   title: ReactNode;
+  /* Same handle, plain text - for the source overlay's "By" line. */
+  handle: string;
   problem: ProblemRef;
   submissions: FriendSubmission[];
   anchor: HTMLElement;
@@ -142,15 +145,20 @@ interface Props {
 /*
  * Small floating list of one friend's submissions on the
  * current problem, opened from the button in their row.
- * Each row links to the submission on Codeforces.
+ * Each row opens that submission's source inline (see
+ * SubmissionSourceOverlay) instead of leaving the page.
  */
 export function FriendSubmissionsPopup({
   title,
+  handle,
   problem,
   submissions,
   anchor,
   onClose,
 }: Props) {
+  const [openedSubmission, setOpenedSubmission] =
+    useState<FriendSubmission | null>(null);
+
   const theme =
     useTheme();
 
@@ -666,21 +674,27 @@ export function FriendSubmissionsPopup({
             );
 
             return url ? (
-              <a
+              <button
                 key={
                   submission.id
                 }
+                type="button"
                 className="cfpm-fsub-row"
-                href={url}
-                target="_blank"
-                rel="noopener"
                 title={`Submission #${submission.id}`}
-                style={
-                  rowStyle
+                style={{
+                  ...rowStyle,
+                  width: '100%',
+                  textAlign: 'left',
+                  font: 'inherit',
+                }}
+                onClick={() =>
+                  setOpenedSubmission(
+                    submission,
+                  )
                 }
               >
                 {body}
-              </a>
+              </button>
             ) : (
               <div
                 key={
@@ -772,8 +786,56 @@ export function FriendSubmissionsPopup({
     </div>
   );
 
-  return createPortal(
-    content,
-    document.body,
+  const openedUrl =
+    openedSubmission
+      ? buildFriendSubmissionUrl(
+          openedSubmission,
+          problem.contestId,
+        )
+      : null;
+
+  return (
+    <>
+      {createPortal(
+        content,
+        document.body,
+      )}
+
+      {openedSubmission &&
+        openedUrl && (
+          <SubmissionSourceOverlay
+            url={openedUrl}
+            submissionId={
+              openedSubmission.id
+            }
+            handle={handle}
+            problemIndex={
+              problem.index
+            }
+            verdictLabel={
+              <span
+                style={{
+                  color:
+                    toneColor[
+                      verdictTone(
+                        openedSubmission.verdict,
+                      )
+                    ],
+                }}
+              >
+                {verdictLabel(
+                  openedSubmission,
+                )}
+              </span>
+            }
+            theme={theme}
+            onClose={() =>
+              setOpenedSubmission(
+                null,
+              )
+            }
+          />
+        )}
+    </>
   );
 }

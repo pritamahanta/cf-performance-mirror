@@ -840,6 +840,9 @@ export function OnlineFriendsPanel() {
                 }
               />
             }
+            handle={
+              openedFriend.handle
+            }
             problem={problem}
             submissions={
               openedSubmissions

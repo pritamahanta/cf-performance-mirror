@@ -698,3 +698,106 @@ export async function fetchUsersInfo(
 
   return results;
 }
+
+/* Longest the extension waits for a submission page to load. */
+const SUBMISSION_PAGE_TIMEOUT_MS =
+  15_000;
+
+/*
+ * Codeforces renders a viewable submission's source directly on its
+ * own page, inside `<pre id="program-source-text">` - the same
+ * element its own "view source" dialog reads from. There is no
+ * public API for this (user.status never includes source), so this
+ * reads the submission's own page the same way fetchOnlineFriends and
+ * checkProfileOnlineStatus already read other Codeforces pages.
+ *
+ * Not every submission is viewable this way - the author may have
+ * restricted it, or the viewer may simply not be allowed to see it -
+ * so a page that loads but has no such element throws, rather than
+ * returning something that looks like source but is not. The caller
+ * is expected to fall back to linking straight to `url` when this
+ * rejects.
+ */
+export async function fetchSubmissionSourceText(
+  url: string,
+  signal?: AbortSignal,
+  timeoutMs = SUBMISSION_PAGE_TIMEOUT_MS,
+): Promise<string> {
+  const limit =
+    new AbortController();
+
+  const relay = () => {
+    limit.abort();
+  };
+
+  if (signal?.aborted) {
+    relay();
+  } else {
+    signal?.addEventListener(
+      'abort',
+      relay,
+      { once: true },
+    );
+  }
+
+  const timer =
+    setTimeout(
+      relay,
+      timeoutMs,
+    );
+
+  let html: string;
+
+  try {
+    const response =
+      await fetch(
+        url,
+        {
+          credentials: 'include',
+          cache: 'no-store',
+          signal: limit.signal,
+        },
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not load the submission page (status ${response.status}).`,
+      );
+    }
+
+    html =
+      await response.text();
+  } finally {
+    clearTimeout(timer);
+
+    signal?.removeEventListener(
+      'abort',
+      relay,
+    );
+  }
+
+  const doc =
+    new DOMParser().parseFromString(
+      html,
+      'text/html',
+    );
+
+  const sourceEl =
+    doc.querySelector(
+      '#program-source-text',
+    );
+
+  const sourceText =
+    sourceEl?.textContent;
+
+  if (
+    !sourceText ||
+    !sourceText.trim()
+  ) {
+    throw new Error(
+      "Couldn't load this submission's source code inline.",
+    );
+  }
+
+  return sourceText;
+}

@@ -44,6 +44,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
   const [search, setSearch] = useState('');
   const [popup, setPopup] = useState<{
     anchor: HTMLElement; label: string; ids: number[]; contestId: number; bg: string; fg: string;
+    problemIndex: string; problemName: string; problemContestName?: string;
   } | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -125,10 +126,15 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
   };
   const maxErrors = Math.max(...sorted.map(problem => totalErrors(problem)), 1);
 
-  const openSubmission = (event: MouseEvent<HTMLElement>, label: string, ids: number[], bg: string, fg: string, contestId: number) => {
+  const openSubmission = (event: MouseEvent<HTMLElement>, label: string, ids: number[], bg: string, fg: string, contestId: number, problem: ProblemEntry) => {
     event.stopPropagation();
     const anchor = event.currentTarget;
-    setPopup(current => current?.anchor === anchor ? null : { anchor, label, ids, bg, fg, contestId });
+    setPopup(current => current?.anchor === anchor
+      ? null
+      : {
+        anchor, label, ids, bg, fg, contestId,
+        problemIndex: problem.index, problemName: problem.name, problemContestName: problem.contestName,
+      });
   };
 
   const activeFilter = settings.tagFilters.length > 0 || settings.minAttempts !== 1 || settings.ratingMin !== '' || settings.ratingMax !== '';
@@ -317,6 +323,9 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
             crossContest={popup.contestId <= 0}
             crossContestSort={popupSort}
             anchor={popup.anchor}
+            problemIndex={popup.problemIndex}
+            problemName={popup.problemName}
+            problemContestName={popup.problemContestName}
             onCrossContestSortChange={onPopupSortChange}
             onClose={() => setPopup(null)}
           />
@@ -602,7 +611,8 @@ function ProblemRow({
     ids: number[],
     bg: string,
     fg: string,
-    contestId: number
+    contestId: number,
+    problem: ProblemEntry
   ) => void;
 }) {
   const errors = totalErrors(problem);
@@ -813,7 +823,8 @@ function ProblemRow({
                   ids,
                   bg,
                   fg,
-                  problem.contestId
+                  problem.contestId,
+                  problem
                 );
               }}
             >
@@ -852,7 +863,8 @@ function ProblemRow({
                 problem.acIds,
                 theme.solvedBadge,
                 theme.solvedBadgeText,
-                problem.contestId
+                problem.contestId,
+                problem
               );
             }
           }}

@@ -4,6 +4,21 @@ import { createPortal } from 'react-dom';
 import { buildSubmissionUrl, submissionSortKey } from '../../domain/friction';
 import type { SubmissionTiming } from '../../types/performance';
 import type { Theme } from '../../domain/theme';
+import { SubmissionSourceOverlay } from '../SubmissionSourceOverlay';
+
+/*
+ * This popup only ever opens on a Codeforces profile page (see
+ * installApp()/getProfileHandle() in content/main.tsx, which the
+ * whole performance panel - this popup included - depends on), so
+ * the handle it shows "By" in the source overlay is simply that
+ * page's own path segment; no extra prop-threading needed for it.
+ */
+const PROFILE_PATH_RE = /^\/profile\/([^/]+)\/?$/;
+
+function getViewedProfileHandle(): string | null {
+  const match = PROFILE_PATH_RE.exec(window.location.pathname);
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 interface Props {
   label: string;
@@ -17,16 +32,22 @@ interface Props {
   crossContest?: boolean;
   crossContestSort: 'time' | 'contest';
   anchor: HTMLElement;
+  /* The one problem every id in `ids` belongs to - for the source overlay's header. */
+  problemIndex?: string;
+  problemName?: string;
+  problemContestName?: string;
   onCrossContestSortChange?: (mode: 'time' | 'contest') => void;
   onClose: () => void;
 }
 
 export function SubmissionPopup({
   label, ids, contestId, badgeBg, badgeFg, timingMap, contestMap, theme,
-  crossContest = false, crossContestSort, anchor, onCrossContestSortChange, onClose,
+  crossContest = false, crossContestSort, anchor, problemIndex, problemName, problemContestName,
+  onCrossContestSortChange, onClose,
 }: Props) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: -9999, left: -9999 });
+  const [openedSubmission, setOpenedSubmission] = useState<{ id: number; url: string } | null>(null);
 
   const reposition = () => {
     const popup = popupRef.current;
@@ -164,12 +185,40 @@ export function SubmissionPopup({
           );
 
           return url
-            ? <a key={id} className="cfpm-sub-link" href={url} target="_blank" rel="noopener" style={itemStyle}>{children}</a>
+            ? (
+              <button
+                key={id}
+                type="button"
+                className="cfpm-sub-link"
+                style={{ ...itemStyle, width: '100%', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+                onClick={() => setOpenedSubmission({ id, url })}
+              >
+                {children}
+              </button>
+            )
             : <div key={id} className="cfpm-sub-link" style={itemStyle}>{children}</div>;
         })}
       </div>
     </div>
   );
 
-  return createPortal(content, document.body);
+  return (
+    <>
+      {createPortal(content, document.body)}
+
+      {openedSubmission && (
+        <SubmissionSourceOverlay
+          url={openedSubmission.url}
+          submissionId={openedSubmission.id}
+          handle={getViewedProfileHandle() ?? '—'}
+          contestName={problemContestName}
+          problemIndex={problemIndex}
+          problemName={problemName}
+          verdictLabel={<span style={{ color: badgeFg }}>{label}</span>}
+          theme={theme}
+          onClose={() => setOpenedSubmission(null)}
+        />
+      )}
+    </>
+  );
 }

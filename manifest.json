@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CF Performance Mirror",
   "short_name": "CF Mirror",
-  "description": "Analyze your Codeforces performance — solve time, failure rates, rating changes, and errors by division and time range.",
+  "description": "Analyze Codeforces performance—solve time, failure rates, rating changes, errors by division and time range, and online friends.",
   "version": "1.0.16",
   "icons": {
     "16": "icons/icon16.png",
