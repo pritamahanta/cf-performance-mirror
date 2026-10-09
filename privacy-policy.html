@@ -71,8 +71,8 @@
 
   <section>
     <h2>1. Overview</h2>
-    <p>CF Performance Mirror ("the Extension") is a browser extension that displays enhanced performance statistics on Codeforces profile pages and, if you turn it on, an Online Friends panel in the Codeforces sidebar. This Privacy Policy explains what data the Extension accesses, how it is used, and your rights as a user.</p>
-    <p>This policy applies to all users of the Extension and was last updated on <strong>October 8, 2026</strong>.</p>
+    <p>CF Performance Mirror ("the Extension") is a browser extension that displays enhanced performance statistics on Codeforces profile pages and, if you turn them on, an Online Friends panel and a Friends submissions box in the Codeforces sidebar. This Privacy Policy explains what data the Extension accesses, how it is used, and your rights as a user.</p>
+    <p>This policy applies to all users of the Extension and was last updated on <strong>October 10, 2026</strong>.</p>
   </section>
 
   <section>
@@ -89,7 +89,12 @@
       <li>Loads <code>https://codeforces.com/friends</code> using your browser's existing Codeforces login session, the same way the site would if you opened that page. The Extension never sees, stores, or transmits your password or session token — only the list of friend handles that page shows.</li>
       <li>Reads each friend's public profile page (the same "Last visit: online now" text anyone can see there) to tell who is online.</li>
       <li>Asks the Codeforces <code>user.info</code> API about your friends' handles, to get their rating, rank and when each was last active. These requests are made by the Extension's background service worker.</li>
-      <li>On problem pages of regular contests (not gym contests), asks the Codeforces <code>contest.status</code> API for each online friend's submissions in that contest, to show who has solved the problem. Only the friend's handle and the contest id are sent, to codeforces.com.</li>
+    </ul>
+    <p>The <strong>Friends submissions box</strong> is a separate option, also off by default, and only works while you are logged in to Codeforces. It appears on problem pages of regular contests (not gym contests). When you turn it on and its box is open, the Extension:</p>
+    <ul>
+      <li>Loads <code>https://codeforces.com/friends</code> the same way as above, to get your friends' handles.</li>
+      <li>Asks the Codeforces <code>contest.status</code> API for each friend's submissions in the contest of the problem page you opened. Only the friend's handle and the contest id are sent, to codeforces.com.</li>
+      <li>Asks the Codeforces <code>user.info</code> API about the friends who have a submission on the problem, to colour their handles by rating. These requests are made directly from the page, not by the background service worker.</li>
     </ul>
   </section>
 
@@ -98,8 +103,9 @@
     <p>Data fetched from the Codeforces API is used exclusively to:</p>
     <ul>
       <li>Calculate and display performance statistics (solve times, failure rates, rating changes) on the profile page you are viewing.</li>
-      <li>Remember your filter and display preferences locally using <code>localStorage</code> in your browser, including whether the Online Friends panel is turned on and open.</li>
-      <li>If you turn on the Online Friends panel: show which friends are online, with their rating, and who has solved the problem you are viewing.</li>
+      <li>Remember your filter and display preferences locally using <code>localStorage</code> in your browser, including whether the Online Friends panel and the Friends submissions box are turned on and open.</li>
+      <li>If you turn on the Online Friends panel: show which friends are online, with their rating.</li>
+      <li>If you turn on the Friends submissions box: show which of your friends have submitted the problem you are viewing, and whether they solved it.</li>
     </ul>
     <p>The Extension does not use this data for advertising, analytics, profiling, or any purpose other than rendering the on-page display.</p>
   </section>
@@ -110,7 +116,12 @@
     <p>If you turn on the Online Friends panel, it also stores:</p>
     <ul>
       <li>In <code>localStorage</code>, keyed to your logged-in Codeforces handle: your friends' handles, whether each was online and when that was checked, the rating and rank of friends shown as online, and when each friend was last active according to Codeforces. If the Extension cannot tell which account is logged in, it stores nothing. A stored list belonging to another account, or left from a logged-out state, is deleted the next time a Codeforces page that has a sidebar loads, even if the panel is turned off.</li>
+    </ul>
+    <p>If you turn on the Friends submissions box, it also keeps:</p>
+    <ul>
+      <li>In memory only (gone when the page is closed or reloaded): your friends' handles, for up to 5 minutes.</li>
       <li>In <code>sessionStorage</code> (this browser tab only, gone when the tab is closed): a friend's submissions in the contest of the problem page you opened — submission id, problem letter, submission time, participant type, time since the contest started, verdict, test set and passed-test count — reused for up to 10 minutes.</li>
+      <li>In <code>localStorage</code>: only whether the box is turned on and open.</li>
     </ul>
     <p>All of this data:</p>
     <ul>
@@ -123,14 +134,14 @@
 
   <section>
     <h2>5. Data Sharing and Third Parties</h2>
-    <p>We do not share any data with third parties. The only external communication made by the Extension is outbound requests to <code>codeforces.com</code> — the site you are already browsing. That includes the Codeforces API and, if you turn on the Online Friends panel, your friends page and your friends' public profile pages. No data is sent to the developer or any analytics service. These are ordinary requests from your browser to codeforces.com, so Codeforces can see them the way it sees any page you load.</p>
+    <p>We do not share any data with third parties. The only external communication made by the Extension is outbound requests to <code>codeforces.com</code> — the site you are already browsing. That includes the Codeforces API and, if you turn on the Online Friends panel or the Friends submissions box, your friends page and, for Online Friends, your friends' public profile pages. No data is sent to the developer or any analytics service. These are ordinary requests from your browser to codeforces.com, so Codeforces can see them the way it sees any page you load.</p>
   </section>
 
   <section>
     <h2>6. Permissions</h2>
     <p>The Extension requests the following permissions:</p>
     <ul>
-      <li><strong>Host access to <code>codeforces.com</code></strong> — required to inject the statistics panel into Codeforces profile pages and the Online Friends panel into Codeforces pages with a sidebar, and to make requests to the Codeforces public API and site pages.</li>
+      <li><strong>Host access to <code>codeforces.com</code></strong> — required to inject the statistics panel into Codeforces profile pages and the Online Friends panel and Friends submissions box into Codeforces pages with a sidebar, and to make requests to the Codeforces public API and site pages.</li>
     </ul>
     <p>No other permissions are requested or used.</p>
   </section>

@@ -40,12 +40,29 @@ export function listNotes(input: NoteInput): string[] {
   return notes;
 }
 
-export interface SolvedLimitInput {
-  /* A problem page with the solved-marker feature active. */
-  onProblemPage: boolean;
+/* ---- Friends submissions box ---- */
 
-  /* Online friends currently listed. */
-  listedCount: number;
+export const LIST_LOADING_MESSAGE = 'Loading your friends\u2026';
+
+export function noSubmissionsMessage(checked: number): string {
+  return checked === 1
+    ? 'The friend checked has no submissions on this problem.'
+    : `None of the ${checked} friends checked has submitted this problem.`;
+}
+
+export function checkingMessage(done: number, total: number): string {
+  return `Checking friends\u2019 submissions\u2026 ${done}/${total}`;
+}
+
+export function failedNote(failed: number): string {
+  return failed === 1
+    ? "1 friend couldn't be checked."
+    : `${failed} friends couldn't be checked.`;
+}
+
+export interface CheckedScopeInput {
+  /* Friends on the friends list. */
+  totalFriends: number;
 
   /* How many of them, from the top, are being checked now. */
   checkedLimit: number;
@@ -54,7 +71,7 @@ export interface SolvedLimitInput {
   batchSize: number;
 }
 
-export interface SolvedLimitInfo {
+export interface CheckedScopeInfo {
   text: string;
 
   /* How many friends the next click will add to the check. */
@@ -62,16 +79,16 @@ export interface SolvedLimitInfo {
 }
 
 /*
- * Set only when some listed friends are not being checked for solved
- * marks; null when every listed friend is covered (or off a problem page).
+ * Set only when some friends are not being checked yet; null when every
+ * friend is covered.
  */
-export function solvedLimitInfo(input: SolvedLimitInput): SolvedLimitInfo | null {
-  if (!input.onProblemPage || input.listedCount <= input.checkedLimit) {
+export function checkedScopeInfo(input: CheckedScopeInput): CheckedScopeInfo | null {
+  if (input.totalFriends <= input.checkedLimit) {
     return null;
   }
 
   return {
-    text: `Solved marks are checked for the first ${input.checkedLimit} of ${input.listedCount} online friends.`,
-    nextBatch: Math.min(input.batchSize, input.listedCount - input.checkedLimit),
+    text: `Checked the first ${input.checkedLimit} of ${input.totalFriends} friends.`,
+    nextBatch: Math.min(input.batchSize, input.totalFriends - input.checkedLimit),
   };
 }

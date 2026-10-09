@@ -31,7 +31,7 @@ export type FriendProblemEntry =
     };
 
 /*
- * Safety valve: with a very large number of online
+ * Safety valve: with a very large number of
  * friends, only the first few are checked, so opening a
  * problem page can never turn into an unbounded burst of
  * API calls. This is also the batch size: the panel
@@ -52,7 +52,7 @@ export interface FriendProblemSubmissions {
 }
 
 /*
- * For each given (online) friend, loads their submissions
+ * For each given friend, loads their submissions
  * in the problem's contest so the panel can tell who has
  * solved it. Results are keyed by lower-cased handle.
  *

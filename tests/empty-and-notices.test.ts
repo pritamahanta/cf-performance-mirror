@@ -11,8 +11,11 @@ import {
   NO_FRIENDS_MESSAGE,
   SLOW_SCAN_NOTE,
   emptyListMessage,
+  checkedScopeInfo,
+  checkingMessage,
+  failedNote,
   listNotes,
-  solvedLimitInfo,
+  noSubmissionsMessage,
 } from '../src/domain/panelNotices.ts';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -186,28 +189,29 @@ test('notices: the incomplete note no longer claims a last known status', () => 
   assert.match(INCOMPLETE_NOTE, /missing/);
 });
 
-test('notices: the solved-marker limit shows only on a problem page with unchecked friends', () => {
-  const base = { onProblemPage: true, batchSize: 30 };
+test('notices: the checked-scope note shows only while some friends are unchecked', () => {
+  const base = { batchSize: 30 };
 
-  assert.equal(solvedLimitInfo({ ...base, listedCount: 30, checkedLimit: 30 }), null, 'everyone covered');
-  assert.equal(solvedLimitInfo({ ...base, listedCount: 12, checkedLimit: 30 }), null, 'fewer than the limit');
-  assert.equal(solvedLimitInfo({ ...base, onProblemPage: false, listedCount: 500, checkedLimit: 30 }), null, 'not a problem page');
+  assert.equal(checkedScopeInfo({ ...base, totalFriends: 30, checkedLimit: 30 }), null, 'everyone covered');
+  assert.equal(checkedScopeInfo({ ...base, totalFriends: 12, checkedLimit: 30 }), null, 'fewer than the limit');
 
-  const info = solvedLimitInfo({ ...base, listedCount: 100, checkedLimit: 30 });
-  assert.deepEqual(info, {
-    text: 'Solved marks are checked for the first 30 of 100 online friends.',
+  assert.deepEqual(checkedScopeInfo({ ...base, totalFriends: 100, checkedLimit: 30 }), {
+    text: 'Checked the first 30 of 100 friends.',
     nextBatch: 30,
   });
 });
 
 test('notices: the next batch never promises more friends than are left', () => {
-  const info = solvedLimitInfo({ onProblemPage: true, listedCount: 45, checkedLimit: 30, batchSize: 30 });
-  assert.equal(info?.nextBatch, 15);
-  assert.equal(
-    solvedLimitInfo({ onProblemPage: true, listedCount: 45, checkedLimit: 60, batchSize: 30 }),
-    null,
-    'once the limit passes the list, the note goes away',
-  );
+  assert.equal(checkedScopeInfo({ totalFriends: 45, checkedLimit: 30, batchSize: 30 })?.nextBatch, 15);
+  assert.equal(checkedScopeInfo({ totalFriends: 45, checkedLimit: 60, batchSize: 30 }), null);
+});
+
+test('notices: friends-submissions wording', () => {
+  assert.equal(noSubmissionsMessage(1), 'The friend checked has no submissions on this problem.');
+  assert.equal(noSubmissionsMessage(30), 'None of the 30 friends checked has submitted this problem.');
+  assert.equal(failedNote(1), "1 friend couldn't be checked.");
+  assert.equal(failedNote(3), "3 friends couldn't be checked.");
+  assert.equal(checkingMessage(4, 30), 'Checking friends\u2019 submissions\u2026 4/30');
 });
 
 test('notices: every applicable list note is shown, in order', () => {

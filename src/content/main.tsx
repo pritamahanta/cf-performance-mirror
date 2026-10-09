@@ -6,7 +6,9 @@ import {
 } from 'react';
 
 import { PerformanceMirror } from '../components/PerformanceMirror';
+import { FriendSubmissionsPanel } from '../components/friends/FriendSubmissionsPanel';
 import { OnlineFriendsPanel } from '../components/friends/OnlineFriendsPanel';
+import { parseProblemPage } from '../domain/friendSubmissions';
 import { useTheme } from '../hooks/useTheme';
 import { normalizeSettings } from '../domain/settings';
 import { PerformanceEngine } from '../domain/performanceEngine';
@@ -25,6 +27,7 @@ import {
 
 import {
   mountExtension,
+  mountFriendSubmissionsHost,
   mountOnlineFriendsHost,
   observeWidth,
 } from './mount';
@@ -601,10 +604,54 @@ function mountOnlineFriendsWidget(): void {
   );
 }
 
+/*
+ * The Friends submissions box, independent of Online Friends. Only
+ * mounted on a problem page of a regular contest (parseProblemPage is
+ * null everywhere else, gym problems included), so other pages get no
+ * box and make no requests. Like the other box it follows the saved
+ * "friendSubmissionsVisible" setting itself.
+ */
+function mountFriendSubmissionsWidget(): void {
+  const problem =
+    parseProblemPage(
+      window.location.pathname,
+    );
+
+  if (!problem) {
+    return;
+  }
+
+  const host =
+    mountFriendSubmissionsHost();
+
+  if (!host) {
+    return;
+  }
+
+  if (
+    host.dataset
+      .cfpmMounted ===
+    'true'
+  ) {
+    return;
+  }
+
+  host.dataset.cfpmMounted =
+    'true';
+
+  createRoot(host).render(
+    <FriendSubmissionsPanel
+      problem={problem}
+    />,
+  );
+}
+
 function installApp(): void {
   ensureStylesInjected();
 
   mountOnlineFriendsWidget();
+
+  mountFriendSubmissionsWidget();
 
   /*
    * Everything below is the full performance panel, which

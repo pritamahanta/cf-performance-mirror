@@ -277,6 +277,57 @@ export function Controls({
             </svg>
           </button>
 
+          <button
+            className={`cfpm-icon-btn ${settings.friendSubmissionsVisible
+              ? 'active'
+              : ''
+              }`}
+            title={
+              settings.friendSubmissionsVisible
+                ? 'Hide friends submissions'
+                : 'Show friends submissions'
+            }
+            style={{
+              background:
+                settings.friendSubmissionsVisible
+                  ? theme.btnActiveBg
+                  : theme.btnBg,
+              color:
+                settings.friendSubmissionsVisible
+                  ? theme.btnActiveText
+                  : theme.muted,
+              border: `1px solid ${settings.friendSubmissionsVisible
+                ? theme.btnActiveBorder
+                : theme.btnBorder
+                }`,
+            }}
+            onClick={() =>
+              onChange({
+                friendSubmissionsVisible:
+                  !settings.friendSubmissionsVisible,
+              })
+            }
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5.5 3.5h8" />
+              <path d="M5.5 8h8" />
+              <path d="M5.5 12.5h8" />
+              <path d="M1.8 3.5l.8.8 1.4-1.6" />
+              <path d="M1.8 8l.8.8 1.4-1.6" />
+              <path d="M1.8 12.5l.8.8 1.4-1.6" />
+            </svg>
+          </button>
+
           <TimelineSelector
             value={settings.timeline}
             customStart={settings.customStart}

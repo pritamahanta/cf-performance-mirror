@@ -22,21 +22,28 @@
       /* Online Friends' own on/off button - same chevron behavior, scoped to its own box
          so it never touches `.caption.titled`, a class Codeforces uses on other sidebar
          boxes too. */
-      #cfpm-online-friends .caption.titled {
+      #cfpm-online-friends .caption.titled,
+      #cfpm-friend-submissions .caption.titled {
         display: flex; align-items: center; justify-content: space-between; gap: 8px;
       }
-      #cfpm-friends-chevron-btn {
+      #cfpm-friends-chevron-btn,
+      #cfpm-fsubs-chevron-btn {
         display: flex; align-items: center; justify-content: center;
         width: 20px; height: 20px; border-radius: 4px;
         border: none; background: transparent; cursor: pointer; color: inherit;
         flex-shrink: 0; outline: none !important;
         -webkit-appearance: none; appearance: none; padding: 0;
       }
-      #cfpm-friends-chevron-btn:hover { background: rgba(128,128,128,0.15) !important; }
+      #cfpm-friends-chevron-btn:hover,
+      #cfpm-fsubs-chevron-btn:hover { background: rgba(128,128,128,0.15) !important; }
       #cfpm-friends-chevron-btn:focus, #cfpm-friends-chevron-btn:active,
-      #cfpm-friends-chevron-btn:focus-visible { outline: none !important; box-shadow: none !important; }
-      #cfpm-friends-chevron-btn svg { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
-      #cfpm-friends-chevron-btn.collapsed svg { transform: rotate(-90deg); }
+      #cfpm-friends-chevron-btn:focus-visible,
+      #cfpm-fsubs-chevron-btn:focus, #cfpm-fsubs-chevron-btn:active,
+      #cfpm-fsubs-chevron-btn:focus-visible { outline: none !important; box-shadow: none !important; }
+      #cfpm-friends-chevron-btn svg,
+      #cfpm-fsubs-chevron-btn svg { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
+      #cfpm-friends-chevron-btn.collapsed svg,
+      #cfpm-fsubs-chevron-btn.collapsed svg { transform: rotate(-90deg); }
 
       #cfpm-compact button {
         box-sizing: border-box; -webkit-appearance: none; appearance: none;
@@ -302,31 +309,29 @@
   .cfpm-friends-refresh.cfpm-spinning { opacity: 0.5; }
 }
 
-/* ---- Friend's submissions on the current problem (problem pages only) ---- */
+/* ---- Friends submissions box (problem pages only) ---- */
 
-/* Handle on the left, tiny button on the right, inside the User cell. */
-.cfpm-friend-user {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  min-width: 0;
-}
-.cfpm-friend-user > a { min-width: 0; overflow-wrap: anywhere; }
+/* Same fixed-width table behavior as the Online Friends list: a long handle wraps instead of widening the box. */
+.cfpm-fsubs-list table.rtable { table-layout: fixed; width: 100%; }
+.cfpm-fsubs-list table.rtable td:first-child { overflow-wrap: anywhere; }
 
-.cfpm-friend-sub-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 auto;
-  width: 18px; height: 18px; margin: 0; padding: 0;
-  border: 0; border-radius: 3px; background: transparent;
-  color: #999999; cursor: pointer;
+.cfpm-fsubs-when { font-size: 0.85em; opacity: 0.7; line-height: 1.25; }
+
+.cfpm-fsubs-result { font-weight: 700; }
+
+.cfpm-fsubs-count,
+.cfpm-fsubs-more {
+  margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; cursor: pointer;
+  text-decoration: underline;
   -webkit-appearance: none; appearance: none;
 }
-.cfpm-friend-sub-btn:hover,
-.cfpm-friend-sub-btn[aria-expanded="true"] { color: #3b5998; background: rgba(128,128,128,0.15); }
-.cfpm-friend-sub-btn:focus-visible { outline: 2px solid rgba(59,89,152,0.6); outline-offset: 1px; }
-.cfpm-friend-sub-btn svg { display: block; }
+.cfpm-fsubs-count:hover,
+.cfpm-fsubs-more:hover { color: #3b5998; }
+.cfpm-fsubs-count:focus-visible,
+.cfpm-fsubs-more:focus-visible { outline: 2px solid rgba(59,89,152,0.6); outline-offset: 1px; }
 
+/* Popup that lists one friend's submissions (opened from the count button). */
 #cfpm-fsub-popup-list::-webkit-scrollbar { width: 4px; }
 #cfpm-fsub-popup-list::-webkit-scrollbar-track { background: transparent; }
 #cfpm-fsub-popup-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-height: 24px; }

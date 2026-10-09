@@ -597,6 +597,44 @@ interface UserInfoResponse {
 const USER_INFO_CHUNK_SIZE =
   100;
 
+/*
+ * user.info through the same serial, paced queue as contest.status
+ * (never overlapping with it), for callers that already queue their
+ * other API calls there. Unlike fetchUsersInfo this goes straight to
+ * the API from the page.
+ *
+ * Codeforces rejects the whole call if any handle in it does not
+ * exist, so a failure here means "no ratings for this chunk", not
+ * "no ratings at all": the caller keeps going without them.
+ */
+export async function fetchUsersInfoPaced(
+  handles: readonly string[],
+  signal?: AbortSignal,
+): Promise<CodeforcesUser[]> {
+  const result: CodeforcesUser[] = [];
+
+  for (let i = 0; i < handles.length; i += USER_INFO_CHUNK_SIZE) {
+    const chunk = handles.slice(i, i + USER_INFO_CHUNK_SIZE);
+
+    try {
+      const users = await pacedApi.get<CodeforcesUser[]>(
+        `/user.info?handles=${chunk.map(encodeURIComponent).join(';')}`,
+        signal,
+      );
+
+      if (Array.isArray(users)) {
+        result.push(...users);
+      }
+    } catch (error) {
+      if (signal?.aborted) {
+        throw error;
+      }
+    }
+  }
+
+  return result;
+}
+
 /* Slightly above the documented 2s between API calls. */
 const USER_INFO_CHUNK_GAP_MS =
   2_100;

@@ -291,9 +291,121 @@ export function submissionMeta(
   return parts.join(' \u00b7 ');
 }
 
+export function formatSubmissionDate(unixSeconds: number): string {
+  try {
+    return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+/*
+ * Short "when" for one line in the sidebar box: the contest time for
+ * contest / virtual submissions ("Contest +1:02"), otherwise the date.
+ */
+export function shortWhen(
+  submission: FriendSubmission,
+  formatDate: (unixSeconds: number) => string,
+): string {
+  const participation = participationLabel(submission.participantType);
+
+  if (participation && typeof submission.contestSeconds === 'number') {
+    return `${participation} +${formatContestTime(submission.contestSeconds)}`;
+  }
+
+  return formatDate(submission.createdAt);
+}
+
 export function buildFriendSubmissionUrl(
   submission: Pick<FriendSubmission, 'id'>,
   contestId: number,
 ): string | null {
   return buildSubmissionUrl(submission.id, contestId);
+}
+
+/*
+ * One row of the Friends submissions box: what a friend did on this
+ * problem, boiled down.
+ */
+export interface FriendProblemSummary {
+  /* Submissions on this problem, newest first. */
+  submissions: FriendSubmission[];
+  solved: boolean;
+
+  /*
+   * The earliest accepted submission (lowest id) when solved, otherwise
+   * the newest submission. This is the one the row's time refers to.
+   */
+  headline: FriendSubmission;
+
+  /* Submissions before the first accepted one (all of them when unsolved). */
+  attemptsBeforeSolve: number;
+}
+
+/* Null when the friend has no submission on the problem. */
+export function summarizeFriend(
+  allSubmissions: readonly FriendSubmission[],
+  index: string,
+): FriendProblemSummary | null {
+  const submissions = submissionsForProblem(allSubmissions, index);
+
+  if (submissions.length === 0) {
+    return null;
+  }
+
+  let firstOk: FriendSubmission | null = null;
+
+  for (const item of submissions) {
+    if (item.verdict === 'OK' && (firstOk === null || item.id < firstOk.id)) {
+      firstOk = item;
+    }
+  }
+
+  if (firstOk) {
+    const okId = firstOk.id;
+
+    return {
+      submissions,
+      solved: true,
+      headline: firstOk,
+      attemptsBeforeSolve: submissions.filter(item => item.id < okId).length,
+    };
+  }
+
+  return {
+    submissions,
+    solved: false,
+    headline: submissions[0],
+    attemptsBeforeSolve: submissions.length,
+  };
+}
+
+/*
+ * Solved friends first (earliest accepted first), then unsolved ones
+ * (most recent attempt first); handle breaks ties so the order is stable
+ * between renders.
+ */
+export function compareSummaries(
+  a: { handle: string; summary: FriendProblemSummary },
+  b: { handle: string; summary: FriendProblemSummary },
+): number {
+  if (a.summary.solved !== b.summary.solved) {
+    return a.summary.solved ? -1 : 1;
+  }
+
+  const byTime = a.summary.solved
+    ? a.summary.headline.createdAt - b.summary.headline.createdAt
+    : b.summary.headline.createdAt - a.summary.headline.createdAt;
+
+  if (byTime !== 0) {
+    return byTime;
+  }
+
+  return a.handle.localeCompare(b.handle);
 }

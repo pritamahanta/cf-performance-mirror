@@ -227,7 +227,11 @@ export function PerformanceMirror({
           current.friendsVisible ===
             fresh.friendsVisible &&
           current.friendsExpanded ===
-            fresh.friendsExpanded
+            fresh.friendsExpanded &&
+          current.friendSubmissionsVisible ===
+            fresh.friendSubmissionsVisible &&
+          current.friendSubmissionsExpanded ===
+            fresh.friendSubmissionsExpanded
             ? current
             : {
                 ...current,
@@ -235,6 +239,10 @@ export function PerformanceMirror({
                   fresh.friendsVisible,
                 friendsExpanded:
                   fresh.friendsExpanded,
+                friendSubmissionsVisible:
+                  fresh.friendSubmissionsVisible,
+                friendSubmissionsExpanded:
+                  fresh.friendSubmissionsExpanded,
               },
       );
     };

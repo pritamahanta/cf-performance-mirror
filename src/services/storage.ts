@@ -54,6 +54,18 @@ export function toggleFriendsExpanded(storage: Storage = localStorage): boolean 
   return next.friendsExpanded;
 }
 
+/*
+ * Same as toggleFriendsExpanded, for `friendSubmissionsExpanded` (the
+ * Friends submissions box's own open/closed chevron). Returns the new
+ * value.
+ */
+export function toggleFriendSubmissionsExpanded(storage: Storage = localStorage): boolean {
+  const next = normalizeSettings(loadSettings(storage));
+  next.friendSubmissionsExpanded = !next.friendSubmissionsExpanded;
+  saveSettings(next, storage);
+  return next.friendSubmissionsExpanded;
+}
+
 export function loadToggle(storage: Storage = localStorage): boolean {
   try {
     const value = storage.getItem(TOGGLE_KEY);

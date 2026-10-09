@@ -25,6 +25,16 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
    * feature on shows the list.
    */
   friendsExpanded: true,
+  /*
+   * Friends submissions box (problem pages only), independent of the
+   * Online Friends box above. Same two-flag pattern: the master switch
+   * is the profile controls' button and is OFF by default, because it
+   * reads the user's authenticated /friends page and sends Codeforces API
+   * requests; the expanded flag is the box's own chevron on the problem
+   * page.
+   */
+  friendSubmissionsVisible: false,
+  friendSubmissionsExpanded: true,
 };
 
 export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
@@ -50,5 +60,7 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     customContestTo: saved.customContestTo ?? DEFAULT_SETTINGS.customContestTo,
     friendsVisible: saved.friendsVisible ?? DEFAULT_SETTINGS.friendsVisible,
     friendsExpanded: saved.friendsExpanded ?? DEFAULT_SETTINGS.friendsExpanded,
+    friendSubmissionsVisible: saved.friendSubmissionsVisible ?? DEFAULT_SETTINGS.friendSubmissionsVisible,
+    friendSubmissionsExpanded: saved.friendSubmissionsExpanded ?? DEFAULT_SETTINGS.friendSubmissionsExpanded,
   };
 }

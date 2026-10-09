@@ -91,38 +91,15 @@ export function findSidebarBoxByText(
   return null;
 }
 
-export function mountOnlineFriendsHost():
-  HTMLElement | null {
-  const existing =
-    document.getElementById(
-      'cfpm-online-friends',
-    );
-
-  if (existing) {
-    return existing;
-  }
-
-  const sidebar =
-    document.getElementById(
-      'sidebar',
-    );
-
-  if (!sidebar) {
-    return null;
-  }
-
-  const host =
-    document.createElement('div');
-
-  host.id =
-    'cfpm-online-friends';
-
-  host.style.width =
-    '100%';
-
-  host.style.boxSizing =
-    'border-box';
-
+/*
+ * Puts a cfpm sidebar box where it is visible without
+ * scrolling (see the layout below), falling back to the top
+ * of the sidebar if Codeforces' own box titles aren't found.
+ */
+function placeInSidebar(
+  sidebar: HTMLElement,
+  host: HTMLElement,
+): void {
   /*
    * Top rated and Top contributors are each about
    * ten rows tall, so placing the box below them
@@ -157,7 +134,7 @@ export function mountOnlineFriendsHost():
       host,
     );
 
-    return host;
+    return;
   }
 
   /*
@@ -178,6 +155,105 @@ export function mountOnlineFriendsHost():
     );
   } else {
     sidebar.appendChild(host);
+  }
+}
+
+export function mountOnlineFriendsHost():
+  HTMLElement | null {
+  const existing =
+    document.getElementById(
+      'cfpm-online-friends',
+    );
+
+  if (existing) {
+    return existing;
+  }
+
+  const sidebar =
+    document.getElementById(
+      'sidebar',
+    );
+
+  if (!sidebar) {
+    return null;
+  }
+
+  const host =
+    document.createElement('div');
+
+  host.id =
+    'cfpm-online-friends';
+
+  host.style.width =
+    '100%';
+
+  host.style.boxSizing =
+    'border-box';
+
+  placeInSidebar(
+    sidebar,
+    host,
+  );
+
+  return host;
+}
+
+/*
+ * The Friends submissions box (problem pages only): directly
+ * ABOVE Online Friends when that box is in the sidebar, otherwise
+ * in the same place Online Friends would go.
+ */
+export function mountFriendSubmissionsHost():
+  HTMLElement | null {
+  const existing =
+    document.getElementById(
+      'cfpm-friend-submissions',
+    );
+
+  if (existing) {
+    return existing;
+  }
+
+  const sidebar =
+    document.getElementById(
+      'sidebar',
+    );
+
+  if (!sidebar) {
+    return null;
+  }
+
+  const host =
+    document.createElement('div');
+
+  host.id =
+    'cfpm-friend-submissions';
+
+  host.style.width =
+    '100%';
+
+  host.style.boxSizing =
+    'border-box';
+
+  const onlineFriends =
+    document.getElementById(
+      'cfpm-online-friends',
+    );
+
+  if (
+    onlineFriends &&
+    onlineFriends.parentElement ===
+      sidebar
+  ) {
+    onlineFriends.insertAdjacentElement(
+      'beforebegin',
+      host,
+    );
+  } else {
+    placeInSidebar(
+      sidebar,
+      host,
+    );
   }
 
   return host;
