@@ -113,3 +113,26 @@ export function saveCachedUserInfos(
     // Storage full or unavailable: skip caching.
   }
 }
+
+/*
+ * Wraps a user.info fetcher so that every rating it returns is also
+ * saved here. The Online Friends box fetches the same ratings the Friends
+ * submissions box needs for its handle colours; with this, whichever
+ * box fetches them first saves the other one its own request.
+ *
+ * The result and any error pass through unchanged, and a failed save
+ * (storage full or unavailable) never turns a good answer into an error.
+ */
+export function cachingUserInfoFetcher<User extends CachedUserInfo, Args extends unknown[]>(
+  fetchInfo: (...args: Args) => Promise<User[]>,
+): (...args: Args) => Promise<User[]> {
+  return async (...args: Args) => {
+    const users = await fetchInfo(...args);
+
+    if (Array.isArray(users) && users.length > 0) {
+      saveCachedUserInfos(users);
+    }
+
+    return users;
+  };
+}

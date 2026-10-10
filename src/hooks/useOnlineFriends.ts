@@ -17,6 +17,10 @@ import {
   createBrowserPersistence,
 } from '../services/onlineStore';
 
+import {
+  cachingUserInfoFetcher,
+} from '../services/userInfoCache';
+
 import type {
   PollerState,
   Progress,
@@ -75,7 +79,8 @@ function createPoller(): OnlineFriendsPoller {
     {
       fetchFriends: fetchOnlineFriends,
       checkProfile: checkProfileOnlineStatus,
-      fetchInfo: fetchUsersInfo,
+      /* The ratings it fetches are also saved for the Friends submissions box. */
+      fetchInfo: cachingUserInfoFetcher(fetchUsersInfo),
     },
     {
       isHidden: () =>
