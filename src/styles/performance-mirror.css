@@ -341,4 +341,5 @@
 #cfpm-fsub-popup-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-height: 24px; }
 
 .cfpm-fsub-row { transition: opacity 0.1s ease; }
-a.cfpm-fsub-row:hover { opacity: 0.72; }
+/* Rows are <button>s, not <a>s: an a-scoped hover selector silently stops matching. */
+.cfpm-fsub-row:hover { opacity: 0.72; }
