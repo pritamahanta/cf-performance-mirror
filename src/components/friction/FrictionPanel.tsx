@@ -36,6 +36,9 @@ const VERDICT_CONFIG = [
 type VerdictKey = typeof VERDICT_CONFIG[number][0];
 type VerdictIdsKey = `${VerdictKey}Ids`;
 
+/* Height (px) of the problem list; same as the Friends submissions list. */
+const LIST_HEIGHT = 260;
+
 export function FrictionPanel({ modeData, category, settings, theme, onSettingsChange, popupSort, onPopupSortChange }: Props) {
   const [source, setSource] = useState<FrictionSource>('category');
   const [sort, setSort] = useState<'errors' | 'rating'>(settings.sortMode);
@@ -143,21 +146,8 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
   return (
     <div
       className="cfpm-friction-section"
-      style={{ marginTop: 10, borderTop: `1px solid ${theme.borderLight}`, paddingTop: 10 }}
+      style={{ marginTop: 0, paddingTop: 0 }}
     >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          color: theme.muted,
-          padding: '0 2px 6px',
-        }}
-      >
-        Problem attempts
-      </div>
-
       <div
         className="cfpm-friction-scrollbox"
         style={{
@@ -303,7 +293,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
         )}
 
         <div className="cfpm-list-scroll" style={{
-          flex: '0 0 196px', overflowY: 'auto', height: 196, width: '100%', boxSizing: 'border-box',
+          flex: `0 0 ${LIST_HEIGHT}px`, overflowY: 'auto', height: LIST_HEIGHT, width: '100%', boxSizing: 'border-box',
         }}>
           {!sorted.length ? (
             <div style={{ padding: '24px 14px', color: theme.emptyText, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>

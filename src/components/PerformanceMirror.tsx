@@ -51,8 +51,19 @@ import {
 } from './controls/Controls';
 
 import {
+  ToggleBar,
+} from './controls/ToggleBar';
+
+import {
+  Sandbox,
+} from './Sandbox';
+
+import {
   FrictionPanel,
 } from './friction/FrictionPanel';
+
+/* Max width (px) of the Timings box; the table scrolls sideways inside it. */
+const TIMINGS_MAX_WIDTH = 560;
 
 interface Props {
   engine: PerformanceEngine;
@@ -327,6 +338,18 @@ export function PerformanceMirror({
     maxWidth: 920,
   };
 
+  const infoLine = (
+    <div
+      className="cfpm-info"
+      style={{
+        color:
+          theme.muted,
+      }}
+    >
+      {infoText}
+    </div>
+  );
+
   return (
     <>
       <div
@@ -433,7 +456,7 @@ export function PerformanceMirror({
             : 'cfpm-collapsed'
         }
       >
-        <Controls
+        <ToggleBar
           settings={
             settings
           }
@@ -449,44 +472,97 @@ export function PerformanceMirror({
           id="cfpm-timeline-extra"
         />
 
-        <div
-          className="cfpm-info"
-          style={{
-            color:
-              theme.muted,
-          }}
-        >
-          {infoText}
-        </div>
-
         {settings.tableVisible && (
-          <div className="cfpm-table-scroll">
+          <Sandbox
+            title="Timings"
+            theme={
+              theme
+            }
+            maxWidth={
+              TIMINGS_MAX_WIDTH
+            }
+          >
+            <Controls
+              settings={
+                settings
+              }
+              theme={
+                theme
+              }
+              onChange={
+                updateSettings
+              }
+            />
+
+            {infoLine}
+
             <div
+              className="cfpm-table-scroll"
               style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                color: theme.muted,
-                padding: '2px 12px 6px',
+                marginBottom: 0,
               }}
             >
-              Contest performance
+              <PerformanceTable
+                modeData={
+                  modeData
+                }
+                category={
+                  settings.category
+                }
+                deltaInfo={
+                  deltaInfo ??
+                  null
+                }
+                theme={
+                  theme
+                }
+                popupSort={
+                  popupSort
+                }
+                onPopupSortChange={
+                  setPopupSort
+                }
+              />
             </div>
+          </Sandbox>
+        )}
 
-            <PerformanceTable
+        {settings.problemsVisible && (
+          <Sandbox
+            title="Problems"
+            theme={
+              theme
+            }
+          >
+            <Controls
+              settings={
+                settings
+              }
+              theme={
+                theme
+              }
+              onChange={
+                updateSettings
+              }
+            />
+
+            {infoLine}
+
+            <FrictionPanel
               modeData={
                 modeData
               }
               category={
                 settings.category
               }
-              deltaInfo={
-                deltaInfo ??
-                null
+              settings={
+                settings
               }
               theme={
                 theme
+              }
+              onSettingsChange={
+                updateSettings
               }
               popupSort={
                 popupSort
@@ -495,32 +571,8 @@ export function PerformanceMirror({
                 setPopupSort
               }
             />
-          </div>
+          </Sandbox>
         )}
-
-        <FrictionPanel
-          modeData={
-            modeData
-          }
-          category={
-            settings.category
-          }
-          settings={
-            settings
-          }
-          theme={
-            theme
-          }
-          onSettingsChange={
-            updateSettings
-          }
-          popupSort={
-            popupSort
-          }
-          onPopupSortChange={
-            setPopupSort
-          }
-        />
       </div>
     </>
   );

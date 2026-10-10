@@ -5,7 +5,11 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   category: 'Div4', mode: 'total', timeline: 'all', sortMode: 'errors',
   hideAC: false, hideTags: false, hideRatings: false, solvedOnly: false,
   minAttempts: 1, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
-  tagFilters: [], tableVisible: true, customContestFrom: '', customContestTo: '',
+  /*
+   * Timings (tableVisible) and Problems (problemsVisible) are panels opened
+   * from their own buttons; both start closed so the card is just the buttons.
+   */
+  tagFilters: [], tableVisible: false, problemsVisible: false, customContestFrom: '', customContestTo: '',
   /*
    * Off by default: it reads the user's own authenticated /friends page
    * (see fetchOnlineFriends) and stores the result in localStorage. An
@@ -56,6 +60,7 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     customEnd: saved.customEnd ?? DEFAULT_SETTINGS.customEnd,
     tagFilters: Array.isArray(saved.tagFilters) ? saved.tagFilters : DEFAULT_SETTINGS.tagFilters,
     tableVisible: saved.tableVisible ?? DEFAULT_SETTINGS.tableVisible,
+    problemsVisible: saved.problemsVisible ?? DEFAULT_SETTINGS.problemsVisible,
     customContestFrom: saved.customContestFrom ?? DEFAULT_SETTINGS.customContestFrom,
     customContestTo: saved.customContestTo ?? DEFAULT_SETTINGS.customContestTo,
     friendsVisible: saved.friendsVisible ?? DEFAULT_SETTINGS.friendsVisible,
