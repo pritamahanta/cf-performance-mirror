@@ -61,7 +61,8 @@ Independent of Online Friends: it lists friends whether or not they are online.
 **What it requests** (all to `codeforces.com`, nothing else), only while the feature is turned on and the box is open:
 - `https://codeforces.com/friends`: your whole friend list, read with your browser's existing login session.
 - The `user.info` API, one request per up to 100 friends, to colour handles by rating. If it fails, the handles are shown uncoloured.
-- The `contest.status` API, once per friend, for the contest of the problem you are viewing. Every friend is checked.
+- Codeforces' own friends-only status page of the problem you are viewing (`/problemset/status/<contest>/problem/<letter>?friends=on`), once, using your login. It shows which friends have submitted the problem, so only those friends are looked up below; if the page is unavailable or may be incomplete, every friend is looked up instead.
+- The `contest.status` API, once per friend who has submitted the problem (every friend when the page above cannot be used), for the contest of the problem you are viewing.
 - These API requests go through one queue and are spaced at about one every 2.1 seconds (Codeforces documents a limit of one API request per two seconds), so they never overlap each other. The rating requests go first. Checking N friends therefore takes about N × 2.1 seconds the first time (103 friends: about 3.6 minutes); friends appear in the list as their results arrive.
 
 **What it shows**

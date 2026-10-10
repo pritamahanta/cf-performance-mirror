@@ -25,7 +25,27 @@ import {
   peekStoredFriendSubmissions,
 } from '../services/friendSubmissions';
 
+import {
+  loadFriendsOnProblem,
+  planFriendScan,
+} from '../services/friendsStatusPage';
+
+import type {
+  FriendIdsByHandle,
+} from '../services/friendsStatusPage';
+
 export type { FriendProblemEntry };
+
+/*
+ * What the friends-only status page said about one problem. `answer` is
+ * null when it could not be relied on (everyone is then checked). The
+ * key says which problem it is for, so an answer is never applied to
+ * another one.
+ */
+interface PageLookup {
+  key: string;
+  answer: FriendIdsByHandle | null;
+}
 
 export interface FriendProblemSubmissions {
   entries: FriendEntries;
@@ -52,6 +72,12 @@ export interface FriendProblemSubmissions {
  * `fetching` lets the caller hold the requests back (while ratings
  * are still being fetched, say) without delaying the stored copies.
  *
+ * One request to Codeforces' friends-only status page for the problem
+ * (see friendsStatusPage.ts) tells which friends have submitted it at
+ * all. Only those friends are then looked up; the others are known to
+ * have nothing on this problem and cost no request. When that page is
+ * unavailable or cannot be trusted, every friend is looked up, as before.
+ *
  * Nothing runs while `active` is false either, and turning
  * it off cancels every call still queued or in flight (the
  * queue can hold one per friend, spaced out over
@@ -71,6 +97,19 @@ export function useFriendProblemSubmissions(
     problem
       ? problem.contestId
       : null;
+
+  const problemIndex =
+    problem
+      ? problem.index
+      : null;
+
+  const pageKey =
+    contestId !== null && problemIndex !== null
+      ? `${contestId}:${problemIndex}`
+      : null;
+
+  const [lookup, setLookup] =
+    useState<PageLookup | null>(null);
 
   /*
    * A string, so the effects below depend on *which*
@@ -163,6 +202,62 @@ export function useFriendProblemSubmissions(
     });
   }, [active, contestId, handlesKey]);
 
+  const hasHandles =
+    handlesKey !== '';
+
+  /*
+   * The one friends-only status page request. It starts as soon as the
+   * friends are known, in parallel with the ratings, and does not wait
+   * for `fetching`.
+   */
+  useEffect(() => {
+    const signal =
+      controllerRef.current
+        ?.signal;
+
+    if (
+      !active ||
+      !signal ||
+      !hasHandles ||
+      contestId === null ||
+      problemIndex === null ||
+      pageKey === null
+    ) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    loadFriendsOnProblem(
+      {
+        contestId,
+        index: problemIndex,
+      },
+      signal,
+    ).then(answer => {
+      if (!cancelled) {
+        setLookup({
+          key: pageKey,
+          answer,
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [active, hasHandles, contestId, problemIndex, pageKey]);
+
+  const lookupSettled =
+    lookup !== null &&
+    lookup.key === pageKey;
+
+  const onProblem =
+    lookupSettled
+      ? lookup.answer
+      : null;
+
   useEffect(() => {
     const signal =
       controllerRef.current
@@ -171,6 +266,7 @@ export function useFriendProblemSubmissions(
     if (
       !active ||
       !fetching ||
+      !lookupSettled ||
       !signal ||
       contestId === null ||
       handlesKey === ''
@@ -181,9 +277,27 @@ export function useFriendProblemSubmissions(
     let cancelled =
       false;
 
-    for (const handle of handlesKey.split(
-      '\n',
-    )) {
+    const plan =
+      planFriendScan(
+        handlesKey.split('\n'),
+        onProblem,
+      );
+
+    /*
+     * Friends the page does not list have no submission on this problem:
+     * settled at once, nothing sent. In memory only - this is not their
+     * contest-wide data, so it must never reach the shared cache.
+     */
+    for (const handle of plan.skip) {
+      setEntries(previous =>
+        applyFresh(previous, handle, []),
+      );
+    }
+
+    for (const {
+      handle,
+      ids,
+    } of plan.scan) {
       setEntries(previous =>
         applyRequested(previous, handle),
       );
@@ -192,6 +306,7 @@ export function useFriendProblemSubmissions(
         contestId,
         handle,
         signal,
+        ids,
       )
         .then(submissions => {
           if (cancelled) {
@@ -216,7 +331,7 @@ export function useFriendProblemSubmissions(
     return () => {
       cancelled = true;
     };
-  }, [active, fetching, contestId, handlesKey]);
+  }, [active, fetching, lookupSettled, onProblem, contestId, handlesKey]);
 
   return { entries };
 }

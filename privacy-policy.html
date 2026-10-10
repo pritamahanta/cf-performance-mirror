@@ -93,7 +93,8 @@
     <p>The <strong>Friends submissions box</strong> is a separate option, also on by default (the Submissions button in the profile page's controls turns it off), and only works while you are logged in to Codeforces. It appears on problem pages of regular contests (not gym contests). While it is on and its box is open, the Extension:</p>
     <ul>
       <li>Loads <code>https://codeforces.com/friends</code> the same way as above, to get your friends' handles.</li>
-      <li>Asks the Codeforces <code>contest.status</code> API for each friend's submissions in the contest of the problem page you opened. Only the friend's handle and the contest id are sent, to codeforces.com.</li>
+      <li>Loads Codeforces' friends-only status page of the problem you opened (<code>https://codeforces.com/problemset/status/&lt;contest&gt;/problem/&lt;letter&gt;?friends=on</code>) using your browser's existing Codeforces login session, to see which of your friends have submitted it. Only the page's list of submissions is read, and the result is kept in memory for 2 minutes.</li>
+      <li>Asks the Codeforces <code>contest.status</code> API for the submissions of each friend who has submitted the problem (of every friend, when that page cannot be used) in the contest of the problem page you opened. Only the friend's handle and the contest id are sent, to codeforces.com.</li>
       <li>Asks the Codeforces <code>user.info</code> API about your friends' handles, to colour them by rating. These requests are made directly from the page, not by the background service worker.</li>
     </ul>
   </section>

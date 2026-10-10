@@ -49,6 +49,24 @@ const inflight = new Map<
 const locks: LockManager | undefined =
   typeof navigator !== 'undefined' ? navigator.locks : undefined;
 
+/*
+ * Whether a stored copy contains every submission in `needed`. A copy that
+ * lacks one (the friend submitted after it was stored) is not good enough
+ * even while it is inside its time to live.
+ */
+function covers(
+  stored: readonly FriendSubmission[],
+  needed: readonly number[] | undefined,
+): boolean {
+  if (!needed || needed.length === 0) {
+    return true;
+  }
+
+  const have = new Set(stored.map(item => item.id));
+
+  return needed.every(id => have.has(id));
+}
+
 async function fetchAndCache(
   contestId: number,
   handle: string,
@@ -80,6 +98,7 @@ function runUnderLock(
   contestId: number,
   handle: string,
   signal?: AbortSignal,
+  needed?: readonly number[],
 ): Promise<FriendSubmission[]> {
   if (!locks || typeof locks.request !== 'function') {
     return fetchAndCache(contestId, handle, signal);
@@ -94,7 +113,7 @@ function runUnderLock(
     /* Another tab may have fetched and cached this while we waited for the lock. */
     const cached = loadCachedSubmissions(contestId, handle);
 
-    if (cached) {
+    if (cached && covers(cached, needed)) {
       return cached;
     }
 
@@ -136,15 +155,19 @@ export function peekStoredFriendSubmissions(
  * deliberately not cached. An aborted signal that has not started its
  * request yet (including one still waiting on the cross-tab lock)
  * sends nothing at all.
+ *
+ * `needed`, when given, are submission ids the copy must contain; a
+ * fresh-looking stored copy without all of them is fetched again.
  */
 export function loadFriendContestSubmissions(
   contestId: number,
   handle: string,
   signal?: AbortSignal,
+  needed?: readonly number[],
 ): Promise<FriendSubmission[]> {
   const cached = loadCachedSubmissions(contestId, handle);
 
-  if (cached) {
+  if (cached && covers(cached, needed)) {
     return Promise.resolve(cached);
   }
 
@@ -155,7 +178,7 @@ export function loadFriendContestSubmissions(
     return running.promise;
   }
 
-  const request = runUnderLock(key, contestId, handle, signal)
+  const request = runUnderLock(key, contestId, handle, signal, needed)
     .finally(() => {
       /* Only remove our own entry, never a newer one that replaced it. */
       if (inflight.get(key)?.promise === request) {

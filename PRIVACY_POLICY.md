@@ -62,9 +62,15 @@ logged in to Codeforces. While it is on and its box is open:
 - It loads `https://codeforces.com/friends` using your browser's existing
   Codeforces login session, as described above, to get your friends'
   handles.
-- It asks the Codeforces `contest.status` API for each friend's submissions
-  in the contest of the problem page you opened. Only the friend's handle and
-  the contest id are sent, to codeforces.com.
+- It loads Codeforces' friends-only status page of the problem you opened
+  (`https://codeforces.com/problemset/status/<contest>/problem/<letter>?friends=on`)
+  using your browser's existing Codeforces login session, to see which of your
+  friends have submitted it. Only the page's list of submissions is read, and
+  the result is kept in memory for 2 minutes.
+- It asks the Codeforces `contest.status` API for the submissions of each
+  friend who has submitted the problem (of every friend, when that page cannot
+  be used) in the contest of the problem page you opened. Only the friend's
+  handle and the contest id are sent, to codeforces.com.
 - It asks the Codeforces `user.info` API about your friends' handles, to
   colour them by rating. These requests are made directly from the page, not
   by the background service worker.
