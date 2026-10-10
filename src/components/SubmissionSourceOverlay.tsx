@@ -223,9 +223,9 @@ export function SubmissionSourceOverlay({
       : theme.dropdownBorder;
 
   /*
-   * No dimming behind the box: the Codeforces dialog does not dim the
-   * page (measured from a screenshot of it). Clicking outside still
-   * closes it.
+   * Measured from the Codeforces dialog: the page behind it is dimmed by
+   * 20% black, and the box is centered, 10% of the window height from
+   * the top. A click outside the box closes it.
    */
   const backdropStyle: CSSProperties =
     {
@@ -233,29 +233,31 @@ export function SubmissionSourceOverlay({
       inset: 0,
       zIndex: 999999,
       background:
-        'transparent',
+        'rgba(0,0,0,0.2)',
       display: 'flex',
       alignItems:
         'flex-start',
       justifyContent:
         'center',
-      padding: '12px 6px',
+      padding: '10vh 6px 0',
       boxSizing:
         'border-box',
     };
 
   /*
-   * Measured from the Codeforces dialog: 3px #ccc border, rounded
-   * corners, 22px padding all round, nearly the full width of the
-   * window, 12px from its top. It grows with the code up to the window
-   * height and then scrolls inside.
+   * Measured from the Codeforces dialog (window 927px high): 1024px
+   * wide including its 3px #ccc border, rounded corners, 22px padding
+   * all round, 674px high (72.7% of the window) when the source is long
+   * enough, with the code scrolling inside. It is narrower only when the
+   * window is.
    */
   const boxStyle: CSSProperties =
     {
       position: 'relative',
       width: '100%',
+      maxWidth: 1024,
       maxHeight:
-        'calc(100vh - 24px)',
+        '72.7vh',
       boxSizing:
         'border-box',
       display: 'flex',
@@ -265,7 +267,7 @@ export function SubmissionSourceOverlay({
       borderRadius: 6,
       border: `3px solid ${light ? '#ccc' : theme.dropdownBorder}`,
       boxShadow:
-        '0 0 24px rgba(0,0,0,0.45)',
+        '0 0 20px rgba(0,0,0,0.37)',
       background:
         light
           ? '#fff'
