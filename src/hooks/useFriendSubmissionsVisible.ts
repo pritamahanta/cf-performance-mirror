@@ -22,7 +22,8 @@ export interface FriendSubmissionsVisibility {
 
   /*
    * The box's own open/closed chevron (`friendSubmissionsExpanded`).
-   * Closed: header only, nothing is requested.
+   * Closed: header only. Requests are unaffected: they are made
+   * whenever the master switch is on (see friendSubmissionsGate).
    */
   expanded: boolean;
 }

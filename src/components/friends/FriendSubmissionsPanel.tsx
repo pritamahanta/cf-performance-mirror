@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import type { ProblemRef } from '../../domain/friendSubmissions';
+import { friendSubmissionsGate } from '../../domain/friendSubmissionsGate';
 
 import {
   LIST_LOADING_MESSAGE,
@@ -52,10 +53,14 @@ const NOTE_STYLE = {
 export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
   const { enabled, expanded } = useFriendSubmissionsVisible();
 
-  /* Nothing is requested while the feature is off or the box is closed. */
-  const active = enabled && expanded;
+  /*
+   * The scan starts as soon as the feature is on, whether or not the box
+   * is open, so a box opened later is already filled. Nothing is requested
+   * while the feature is off.
+   */
+  const { fetching, showBody } = friendSubmissionsGate({ enabled, expanded });
 
-  const feed = useFriendSubmissionsFeed(problem, active);
+  const feed = useFriendSubmissionsFeed(problem, fetching);
 
 
   const [openFriend, setOpenFriend] = useState<{
@@ -68,7 +73,7 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
   }, []);
 
   /* The popup goes away with its row, or when the box is closed or switched off. */
-  const opened = active && openFriend !== null
+  const opened = showBody && openFriend !== null
     ? feed.rows.find(row => row.handle === openFriend.handle)
     : undefined;
 

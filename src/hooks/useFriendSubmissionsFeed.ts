@@ -79,7 +79,8 @@ const NO_HANDLES: string[] = [];
  * was fetched before, in this tab or another, comes from the caches
  * (friends list, ratings, submissions) and sends nothing.
  *
- * Nothing runs while `active` is false (feature off or box closed).
+ * Nothing runs while `active` is false (feature off). It does not depend on
+ * the box being open: the scan starts when the problem page loads.
  */
 export function useFriendSubmissionsFeed(
   problem: ProblemRef,
