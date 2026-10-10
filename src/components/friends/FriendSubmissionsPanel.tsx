@@ -112,35 +112,20 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
 
       {expanded && (
         <>
-          {/*
-           * Fixed height, not a max-height: loading, empty, or
-           * showing 1 row or 50, the box always takes up exactly
-           * this much room, so the rest of the Codeforces page never
-           * shifts as submissions load in or friends are checked.
-           * Only the list inside it scrolls.
-           */}
-          <div
-            style={{
-              height: LIST_MAX_HEIGHT,
-              boxSizing: 'border-box',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
           {feed.list.status === 'loading' && (
-            <div style={{ ...MESSAGE_STYLE, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>{LIST_LOADING_MESSAGE}</div>
+            <div style={MESSAGE_STYLE}>{LIST_LOADING_MESSAGE}</div>
           )}
 
           {feed.list.status === 'error' && (
-            <div style={{ ...MESSAGE_STYLE, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>{feed.list.message}</div>
+            <div style={MESSAGE_STYLE}>{feed.list.message}</div>
           )}
 
           {feed.list.status === 'ready' && totalFriends === 0 && (
-            <div style={{ ...MESSAGE_STYLE, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>{NO_FRIENDS_MESSAGE}</div>
+            <div style={MESSAGE_STYLE}>{NO_FRIENDS_MESSAGE}</div>
           )}
 
           {feed.list.status === 'ready' && totalFriends > 0 && feed.rows.length === 0 && (
-            <div style={{ ...MESSAGE_STYLE, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+            <div style={MESSAGE_STYLE}>
               {feed.busy
                 ? submissionsLoadingMessage(feed.checked, totalFriends)
                 : feed.failed === totalFriends
@@ -152,7 +137,7 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
           {feed.rows.length > 0 && (
             <div
               className="cfpm-list-scroll cfpm-fsubs-list"
-              style={{ flex: 1, minHeight: 0 }}
+              style={{ maxHeight: LIST_MAX_HEIGHT }}
             >
               <table className="rtable">
                 <tbody>
@@ -219,7 +204,6 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
               </table>
             </div>
           )}
-          </div>
 
           {feed.list.status === 'ready' && feed.failed > 0 && !feed.busy && feed.rows.length > 0 && (
             <div style={{ ...NOTE_STYLE, opacity: 0.7 }}>{failedNote(feed.failed)}</div>
