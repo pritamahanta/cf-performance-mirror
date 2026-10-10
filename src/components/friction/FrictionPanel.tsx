@@ -3,7 +3,7 @@ import type { MouseEvent, CSSProperties, ReactNode } from 'react';
 import type { Category, ExtensionSettings } from '../../types/settings';
 import type { ModeData, ProblemEntry } from '../../types/performance';
 import type { Theme } from '../../domain/theme';
-import { getRatingColor, totalErrors } from '../../domain/utils';
+import { totalErrors } from '../../domain/utils';
 import {
   ALL_CF_TAGS,
   filterFrictionProblems,
@@ -120,7 +120,6 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
       : [...settings.tagFilters, tag];
     setPatch({ tagFilters: next });
   };
-  const maxErrors = Math.max(...sorted.map(problem => totalErrors(problem)), 1);
 
   const openSubmissions = (event: MouseEvent<HTMLElement>, ids: number[], verdicts: PopupVerdicts, problem: ProblemEntry) => {
     event.stopPropagation();
@@ -302,7 +301,6 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
                   key={`${problem.contestId}-${problem.index}`}
                   problem={problem}
                   index={index}
-                  maxErrors={maxErrors}
                   theme={theme}
                   source={source}
                   hideTags={settings.hideTags}
@@ -604,8 +602,25 @@ function TopicPicker({ theme, search, setSearch, tags, availableTags, selected, 
  */
 function gridColumns(hideRatings: boolean): string {
   return hideRatings
-    ? '84px minmax(0, 1fr) 96px 112px 92px'
-    : '84px minmax(0, 1fr) 70px 96px 112px 92px';
+    ? '80px minmax(0, 1fr) 96px 104px 88px'
+    : '80px minmax(0, 1fr) 64px 96px 104px 88px';
+}
+
+/*
+ * The Codeforces problemset table's own look. The light values are read off
+ * the live table: 1px #e1e1e1 lines, #f8f8f8 on every other row starting with
+ * the first, #d4edc9 for solved. In dark mode the extension's own theme
+ * colors stand in.
+ */
+function tableLook(theme: Theme) {
+  return theme.isDark
+    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText }
+    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20' };
+}
+
+/* Links look like Codeforces links: blue and underlined, purple once visited (see .cfpm-prob-link). */
+function linkStyle(theme: Theme): CSSProperties {
+  return theme.isDark ? { color: theme.problemLink } : {};
 }
 
 /* Every submission of one problem, and what each one's verdict was. */
@@ -626,11 +641,14 @@ function collectSubmissions(problem: ProblemEntry, theme: Theme): { ids: number[
 }
 
 function ProblemsHeader({ theme, hideRatings }: { theme: Theme; hideRatings: boolean }) {
+  const look = tableLook(theme);
+
   const cell: CSSProperties = {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 700,
-    color: theme.mutedStrong,
+    color: theme.text,
     whiteSpace: 'nowrap',
+    textAlign: 'center',
   };
 
   return (
@@ -640,21 +658,22 @@ function ProblemsHeader({ theme, hideRatings }: { theme: Theme; hideRatings: boo
         gridTemplateColumns: gridColumns(hideRatings),
         alignItems: 'center',
         columnGap: 10,
-        padding: '10px 14px 10px 17px',
+        minHeight: 36,
+        padding: '6px 10px 6px 15px',
         position: 'sticky',
         top: 0,
         zIndex: 1,
-        background: theme.bg,
-        borderBottom: `1px solid ${theme.borderLight}`,
+        background: look.head,
+        borderBottom: `1px solid ${look.line}`,
         boxSizing: 'border-box',
       }}
     >
       <span style={cell}>#</span>
       <span style={cell}>Name</span>
-      {!hideRatings && <span style={{ ...cell, textAlign: 'center' }}>Rating</span>}
-      <span style={{ ...cell, textAlign: 'center' }} title="How many Codeforces users have solved this problem">Solved by</span>
-      <span style={{ ...cell, textAlign: 'center' }}>Submissions</span>
-      <span style={{ ...cell, textAlign: 'center' }}>Status</span>
+      {!hideRatings && <span style={cell}>Rating</span>}
+      <span style={cell} title="How many Codeforces users have solved this problem">Solved by</span>
+      <span style={cell}>Submissions</span>
+      <span style={cell}>Status</span>
     </div>
   );
 }
@@ -662,7 +681,6 @@ function ProblemsHeader({ theme, hideRatings }: { theme: Theme; hideRatings: boo
 function ProblemRow({
   problem,
   index,
-  maxErrors,
   theme,
   source,
   hideTags,
@@ -672,7 +690,6 @@ function ProblemRow({
 }: {
   problem: ProblemEntry;
   index: number;
-  maxErrors: number;
   theme: Theme;
   source: FrictionSource;
   hideTags: boolean;
@@ -687,17 +704,7 @@ function ProblemRow({
   ) => void;
 }) {
   const errors = totalErrors(problem);
-  const intensity = errors / maxErrors;
-
-  const accent =
-    errors === 0
-      ? '#27ae60'
-      : intensity > 0.66
-        ? '#e74c3c'
-        : intensity > 0.33
-          ? '#e67e22'
-          : '#27ae60';
-
+  const look = tableLook(theme);
   const problemUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
   const sourceLabel = source === 'category' ? 'in-contest' : 'practice';
   const { ids, verdicts } = collectSubmissions(problem, theme);
@@ -708,41 +715,30 @@ function ProblemRow({
     gridTemplateColumns: gridColumns(hideRatings),
     alignItems: 'center',
     columnGap: 10,
-    minHeight: 48,
-    padding: '8px 14px',
+    minHeight: 36,
+    padding: '4px 10px',
     boxSizing: 'border-box',
-    borderLeft: `3px solid ${accent}`,
-    borderTop: index > 0 ? `1px solid ${theme.borderLighter}` : undefined,
-    background: index % 2 === 1 ? (theme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)') : 'transparent',
+    /* Solved rows carry the same green edge Codeforces gives them. */
+    borderLeft: `5px solid ${problem.solved ? look.solved : 'transparent'}`,
+    borderTop: index > 0 ? `1px solid ${look.line}` : undefined,
+    background: index % 2 === 0 ? look.zebra : 'transparent',
     width: '100%',
+    fontSize: 13,
   };
 
-  const link: CSSProperties = {
-    color: theme.problemLink,
-    textDecoration: 'none',
-    transition: 'opacity 0.15s ease',
-  };
-
-  const hoverOn = (event: MouseEvent<HTMLElement>) => {
-    event.currentTarget.style.textDecoration = 'underline';
-  };
-  const hoverOff = (event: MouseEvent<HTMLElement>) => {
-    event.currentTarget.style.textDecoration = 'none';
-  };
-
-  const centered: CSSProperties = { textAlign: 'center', fontSize: 12, whiteSpace: 'nowrap' };
+  const link = linkStyle(theme);
+  const centered: CSSProperties = { textAlign: 'center', whiteSpace: 'nowrap' };
 
   return (
     <div style={rowStyle}>
       {/* # */}
       <a
+        className="cfpm-prob-link"
         href={problemUrl}
         target="_blank"
         rel="noopener"
         title={problem.contestName || undefined}
-        style={{ ...link, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
-        onMouseEnter={hoverOn}
-        onMouseLeave={hoverOff}
+        style={{ ...link, ...centered }}
       >
         {problem.contestId}{problem.index}
       </a>
@@ -750,22 +746,19 @@ function ProblemRow({
       {/* Name, with the topic tags quietly beside it */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
         <a
+          className="cfpm-prob-link"
           href={problemUrl}
           target="_blank"
           rel="noopener"
           title={problem.name}
           style={{
             ...link,
-            fontSize: 13,
-            fontWeight: 600,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             flex: '0 1 auto',
             minWidth: 0,
           }}
-          onMouseEnter={hoverOn}
-          onMouseLeave={hoverOff}
         >
           {problem.name}
         </a>
@@ -790,26 +783,34 @@ function ProblemRow({
         )}
       </div>
 
-      {/* Rating */}
+      {/* Rating: plain bold, as on Codeforces */}
       {!hideRatings && (
-        <span style={{ ...centered, fontWeight: 700, color: problem.rating ? getRatingColor(problem.rating) : theme.muted }}>
+        <span style={{ ...centered, fontSize: 12, fontWeight: 700, color: problem.rating ? theme.text : theme.muted }}>
           {problem.rating ?? '—'}
         </span>
       )}
 
       {/* Solved by */}
       <span
-        style={{ ...centered, color: theme.muted }}
+        style={{ ...centered, fontSize: 12, color: theme.text, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
         title={typeof solvedBy === 'number' ? `${solvedBy} users have solved this problem` : undefined}
       >
-        {typeof solvedBy === 'number' ? `x${solvedBy}` : solvedBy === undefined ? '…' : '—'}
+        {typeof solvedBy === 'number' ? (
+          <>
+            <svg width="12" height="13" viewBox="0 0 12 13" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <circle cx="6" cy="3.6" r="2.7" fill={theme.isDark ? '#7aabff' : '#3d6db5'} />
+              <path d="M0.8 12.4c0-3 2.3-4.9 5.2-4.9s5.2 1.9 5.2 4.9z" fill={theme.isDark ? '#7aabff' : '#3d6db5'} />
+            </svg>
+            {`x${solvedBy}`}
+          </>
+        ) : solvedBy === undefined ? '…' : '—'}
       </span>
 
       {/* Submissions: one count, the list opens on click */}
-      <span style={{ textAlign: 'center' }}>
+      <span style={centered}>
         <button
           type="button"
-          className="cfpm-verdict-badge"
+          className="cfpm-prob-link"
           disabled={!ids.length}
           title={
             ids.length
@@ -817,16 +818,12 @@ function ProblemRow({
               : 'No submissions to show'
           }
           style={{
-            background: theme.btnBg,
-            color: theme.problemLink,
-            border: `1px solid ${theme.btnBorder}`,
-            borderRadius: 4,
-            minWidth: 44,
-            height: 24,
-            padding: '0 10px',
-            fontSize: 12,
+            ...link,
+            background: 'none',
+            border: 0,
+            padding: 0,
+            font: 'inherit',
             fontWeight: 700,
-            fontFamily: 'inherit',
             cursor: ids.length ? 'pointer' : 'default',
           }}
           onClick={event => onSubmissions(event, ids, verdicts, problem)}
@@ -835,41 +832,22 @@ function ProblemRow({
         </button>
       </span>
 
-      {/* Status */}
-      <span style={{ textAlign: 'center' }}>
-        {problem.solved ? (
-          <span
-            style={{
-              background: theme.solvedBadge,
-              color: theme.solvedBadgeText,
-              fontSize: 11,
-              fontWeight: 700,
-              padding: '2px 8px',
-              borderRadius: 3,
-              whiteSpace: 'nowrap',
-              display: 'inline-block',
-            }}
-            title={problem.acIds.length ? 'Solved' : 'Solved (the AC submission is outside the current time/mode filter)'}
-          >
-            Solved
-          </span>
-        ) : (
-          <span
-            style={{
-              background: theme.waBadge,
-              color: theme.waBadgeText,
-              fontSize: 11,
-              padding: '2px 8px',
-              borderRadius: 3,
-              whiteSpace: 'nowrap',
-              opacity: 0.7,
-              display: 'inline-block',
-            }}
-            title="Not yet solved"
-          >
-            Unsolved
-          </span>
-        )}
+      {/* Status: a solved row's cell is filled green, like Codeforces' solved marker */}
+      <span
+        title={problem.solved ? (problem.acIds.length ? 'Solved' : 'Solved (the AC submission is outside the current time/mode filter)') : 'Not yet solved'}
+        style={{
+          alignSelf: 'stretch',
+          margin: '-4px 0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 12,
+          fontWeight: problem.solved ? 700 : 400,
+          color: problem.solved ? look.solvedText : theme.muted,
+          background: problem.solved ? look.solved : 'transparent',
+        }}
+      >
+        {problem.solved ? 'Solved' : 'Unsolved'}
       </span>
     </div>
   );
