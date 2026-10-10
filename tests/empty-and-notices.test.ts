@@ -11,8 +11,6 @@ import {
   NO_FRIENDS_MESSAGE,
   SLOW_SCAN_NOTE,
   emptyListMessage,
-  checkedScopeInfo,
-  checkingMessage,
   failedNote,
   listNotes,
   noSubmissionsMessage,
@@ -189,29 +187,11 @@ test('notices: the incomplete note no longer claims a last known status', () => 
   assert.match(INCOMPLETE_NOTE, /missing/);
 });
 
-test('notices: the checked-scope note shows only while some friends are unchecked', () => {
-  const base = { batchSize: 30 };
-
-  assert.equal(checkedScopeInfo({ ...base, totalFriends: 30, checkedLimit: 30 }), null, 'everyone covered');
-  assert.equal(checkedScopeInfo({ ...base, totalFriends: 12, checkedLimit: 30 }), null, 'fewer than the limit');
-
-  assert.deepEqual(checkedScopeInfo({ ...base, totalFriends: 100, checkedLimit: 30 }), {
-    text: 'Checked the first 30 of 100 friends.',
-    nextBatch: 30,
-  });
-});
-
-test('notices: the next batch never promises more friends than are left', () => {
-  assert.equal(checkedScopeInfo({ totalFriends: 45, checkedLimit: 30, batchSize: 30 })?.nextBatch, 15);
-  assert.equal(checkedScopeInfo({ totalFriends: 45, checkedLimit: 60, batchSize: 30 }), null);
-});
-
 test('notices: friends-submissions wording', () => {
   assert.equal(noSubmissionsMessage(1), 'The friend checked has no submissions on this problem.');
   assert.equal(noSubmissionsMessage(30), 'None of the 30 friends checked has submitted this problem.');
   assert.equal(failedNote(1), "1 friend couldn't be checked.");
   assert.equal(failedNote(3), "3 friends couldn't be checked.");
-  assert.equal(checkingMessage(4, 30), 'Checking friends\u2019 submissions\u2026 4/30');
 });
 
 test('notices: every applicable list note is shown, in order', () => {

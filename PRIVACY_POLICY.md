@@ -64,21 +64,22 @@ open:
 - It asks the Codeforces `contest.status` API for each friend's submissions
   in the contest of the problem page you opened. Only the friend's handle and
   the contest id are sent, to codeforces.com.
-- It asks the Codeforces `user.info` API about the friends who have a
-  submission on the problem, to colour their handles by rating. These
-  requests are made directly from the page, not by the background service
-  worker.
+- It asks the Codeforces `user.info` API about your friends' handles, to
+  colour them by rating. These requests are made directly from the page, not
+  by the background service worker.
 
 What is stored on your device:
 
-- In memory only (gone when the page is closed or reloaded): your friends'
-  handles, for up to 5 minutes.
+- In `localStorage`: a friend's submissions in the contest of the problem
+  page you opened — submission id, problem letter, submission time,
+  participant type, time since the contest started, verdict, test set and
+  passed-test count — reused for up to 30 minutes; a friend's rating and rank,
+  reused for up to 6 hours; and whether the box is turned on and open.
 - In `sessionStorage` (this browser tab only, gone when the tab is closed):
-  a friend's submissions in the contest of the problem page you opened —
-  submission id, problem letter, submission time, participant type, time since
-  the contest started, verdict, test set and passed-test count — reused for up
-  to 10 minutes.
-- In `localStorage`: only whether the box is turned on and open.
+  your friends' handles, keyed to your logged-in Codeforces handle, reused for
+  up to 5 minutes. Nothing is stored if the page does not show who is logged
+  in.
+- In memory only: the same friends' handles, while the page is open.
 
 Like the above, none of this is sent to the developer or to any server other
 than codeforces.com.

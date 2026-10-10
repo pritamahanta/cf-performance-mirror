@@ -94,7 +94,7 @@
     <ul>
       <li>Loads <code>https://codeforces.com/friends</code> the same way as above, to get your friends' handles.</li>
       <li>Asks the Codeforces <code>contest.status</code> API for each friend's submissions in the contest of the problem page you opened. Only the friend's handle and the contest id are sent, to codeforces.com.</li>
-      <li>Asks the Codeforces <code>user.info</code> API about the friends who have a submission on the problem, to colour their handles by rating. These requests are made directly from the page, not by the background service worker.</li>
+      <li>Asks the Codeforces <code>user.info</code> API about your friends' handles, to colour them by rating. These requests are made directly from the page, not by the background service worker.</li>
     </ul>
   </section>
 
@@ -119,9 +119,9 @@
     </ul>
     <p>If you turn on the Friends submissions box, it also keeps:</p>
     <ul>
-      <li>In memory only (gone when the page is closed or reloaded): your friends' handles, for up to 5 minutes.</li>
-      <li>In <code>sessionStorage</code> (this browser tab only, gone when the tab is closed): a friend's submissions in the contest of the problem page you opened — submission id, problem letter, submission time, participant type, time since the contest started, verdict, test set and passed-test count — reused for up to 10 minutes.</li>
-      <li>In <code>localStorage</code>: only whether the box is turned on and open.</li>
+      <li>In <code>localStorage</code>: a friend's submissions in the contest of the problem page you opened — submission id, problem letter, submission time, participant type, time since the contest started, verdict, test set and passed-test count — reused for up to 30 minutes; a friend's rating and rank, reused for up to 6 hours; and whether the box is turned on and open.</li>
+      <li>In <code>sessionStorage</code> (this browser tab only, gone when the tab is closed): your friends' handles, keyed to your logged-in Codeforces handle, reused for up to 5 minutes. Nothing is stored if the page does not show who is logged in.</li>
+      <li>In memory only: the same friends' handles, while the page is open.</li>
     </ul>
     <p>All of this data:</p>
     <ul>

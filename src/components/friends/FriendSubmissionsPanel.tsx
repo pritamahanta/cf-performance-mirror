@@ -1,25 +1,17 @@
 import { useCallback, useState } from 'react';
 
-import {
-  formatSubmissionDate,
-  shortWhen,
-} from '../../domain/friendSubmissions';
-
 import type { ProblemRef } from '../../domain/friendSubmissions';
 
 import {
   LIST_LOADING_MESSAGE,
   NO_FRIENDS_MESSAGE,
-  checkedScopeInfo,
-  checkingMessage,
+  SUBMISSIONS_LOADING_MESSAGE,
   failedNote,
   noSubmissionsMessage,
 } from '../../domain/panelNotices';
 
-import { useTheme } from '../../hooks/useTheme';
 import { useFriendSubmissionsFeed } from '../../hooks/useFriendSubmissionsFeed';
 import { useFriendSubmissionsVisible } from '../../hooks/useFriendSubmissionsVisible';
-import { MAX_FRIENDS_CHECKED } from '../../hooks/useFriendProblemSubmissions';
 import { toggleFriendSubmissionsExpanded } from '../../services/storage';
 
 import { FriendSubmissionsPopup } from './FriendSubmissionsPopup';
@@ -64,8 +56,6 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
 
   const feed = useFriendSubmissionsFeed(problem, active);
 
-  /* Result colours follow the page's light/dark detection used everywhere else in cfpm. */
-  const theme = useTheme();
 
   const [openFriend, setOpenFriend] = useState<{
     handle: string;
@@ -88,21 +78,10 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
 
   const totalFriends = feed.list.status === 'ready' ? feed.list.handles.length : 0;
 
-  const scope =
-    feed.list.status === 'ready'
-      ? checkedScopeInfo({
-          totalFriends,
-          checkedLimit: feed.limit,
-          batchSize: MAX_FRIENDS_CHECKED,
-        })
-      : null;
-
-  const done = feed.inScope - feed.loading;
-
   const footerLabel =
     feed.list.status === 'ready' && totalFriends > 0
       ? `${feed.rows.length} with submissions`
-      : ' ';
+      : '\u00a0';
 
   return (
     <div className="roundbox sidebox borderTopRound">
@@ -139,20 +118,15 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
             <div style={MESSAGE_STYLE}>{NO_FRIENDS_MESSAGE}</div>
           )}
 
-          {feed.list.status === 'ready' && totalFriends > 0 && feed.loading > 0 && (
-            <div style={NOTE_STYLE}>{checkingMessage(done, feed.inScope)}</div>
-          )}
-
-          {feed.list.status === 'ready' &&
-            totalFriends > 0 &&
-            feed.loading === 0 &&
-            feed.rows.length === 0 && (
-              <div style={MESSAGE_STYLE}>
-                {feed.failed === feed.inScope
+          {feed.list.status === 'ready' && totalFriends > 0 && feed.rows.length === 0 && (
+            <div style={MESSAGE_STYLE}>
+              {feed.busy
+                ? SUBMISSIONS_LOADING_MESSAGE
+                : feed.failed === totalFriends
                   ? failedNote(feed.failed)
-                  : noSubmissionsMessage(feed.inScope - feed.failed)}
-              </div>
-            )}
+                  : noSubmissionsMessage(totalFriends - feed.failed)}
+            </div>
+          )}
 
           {feed.rows.length > 0 && (
             <div
@@ -162,9 +136,11 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
               <table className="rtable">
                 <tbody>
                   <tr>
-                    <th className="left">User</th>
-                    <th style={{ width: '4.5em' }}>Result</th>
-                    <th style={{ width: '2.75em' }}>Subs</th>
+                    <th className="left" style={{ width: '2.25em' }}>
+                      &nbsp;
+                    </th>
+                    <th>User</th>
+                    <th style={{ width: '3.25em' }}>Subs</th>
                   </tr>
 
                   {feed.rows.map((row, index) => {
@@ -173,34 +149,25 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
 
                     return (
                       <tr key={row.handle}>
-                        <td className={dark ? 'left dark' : 'left'}>
-                          <RatedHandle handle={row.handle} rank={row.rank} />
-
-                          <div className="cfpm-fsubs-when">
-                            {shortWhen(summary.headline, formatSubmissionDate)}
-                          </div>
+                        <td
+                          className={dark ? 'left dark' : 'left'}
+                          title={summary.solved ? 'Solved' : 'Not solved'}
+                        >
+                          <span
+                            role="img"
+                            aria-label={summary.solved ? 'Solved' : 'Not solved'}
+                            style={{
+                              display: 'inline-block',
+                              width: 7,
+                              height: 7,
+                              borderRadius: '50%',
+                              background: summary.solved ? '#2ecc71' : '#e74c3c',
+                            }}
+                          />
                         </td>
 
                         <td className={dark ? 'dark' : ''}>
-                          <span
-                            className="cfpm-fsubs-result"
-                            style={{
-                              color: summary.solved
-                                ? theme.solvedBadgeText
-                                : theme.waBadgeText,
-                            }}
-                            title={
-                              summary.solved
-                                ? summary.attemptsBeforeSolve === 0
-                                  ? 'Solved on the first submission'
-                                  : `Solved after ${summary.attemptsBeforeSolve} earlier submission${
-                                      summary.attemptsBeforeSolve === 1 ? '' : 's'
-                                    }`
-                                : 'No accepted submission'
-                            }
-                          >
-                            {summary.solved ? 'Solved' : 'Unsolved'}
-                          </span>
+                          <RatedHandle handle={row.handle} rank={row.rank} />
                         </td>
 
                         <td className={dark ? 'dark' : ''}>
@@ -232,22 +199,8 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
             </div>
           )}
 
-          {feed.list.status === 'ready' && feed.failed > 0 && feed.loading === 0 && feed.rows.length > 0 && (
+          {feed.list.status === 'ready' && feed.failed > 0 && !feed.busy && feed.rows.length > 0 && (
             <div style={{ ...NOTE_STYLE, opacity: 0.7 }}>{failedNote(feed.failed)}</div>
-          )}
-
-          {scope && (
-            <div style={NOTE_STYLE}>
-              <span style={{ opacity: 0.7 }}>{scope.text}</span>{' '}
-              <button
-                type="button"
-                className="cfpm-fsubs-more"
-                onClick={feed.checkMore}
-                title={`Sends ${scope.nextBatch} more Codeforces requests, about one every 2 seconds`}
-              >
-                {`Check next ${scope.nextBatch}`}
-              </button>
-            </div>
           )}
 
           <div className="cfpm-friends-footer">

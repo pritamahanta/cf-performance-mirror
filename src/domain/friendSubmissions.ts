@@ -134,7 +134,7 @@ export function compactSubmissions(
   return result;
 }
 
-/* Guards data read back from sessionStorage. */
+/* Guards data read back from storage. */
 export function isFriendSubmission(value: unknown): value is FriendSubmission {
   if (!value || typeof value !== 'object') {
     return false;
@@ -289,37 +289,6 @@ export function submissionMeta(
   parts.push(formatDate(submission.createdAt));
 
   return parts.join(' \u00b7 ');
-}
-
-export function formatSubmissionDate(unixSeconds: number): string {
-  try {
-    return new Date(unixSeconds * 1000).toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '';
-  }
-}
-
-/*
- * Short "when" for one line in the sidebar box: the contest time for
- * contest / virtual submissions ("Contest +1:02"), otherwise the date.
- */
-export function shortWhen(
-  submission: FriendSubmission,
-  formatDate: (unixSeconds: number) => string,
-): string {
-  const participation = participationLabel(submission.participantType);
-
-  if (participation && typeof submission.contestSeconds === 'number') {
-    return `${participation} +${formatContestTime(submission.contestSeconds)}`;
-  }
-
-  return formatDate(submission.createdAt);
 }
 
 export function buildFriendSubmissionUrl(

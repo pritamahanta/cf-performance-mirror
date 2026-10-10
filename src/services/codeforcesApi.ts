@@ -770,6 +770,157 @@ export interface SubmissionSource {
   text: string;
 }
 
+/*
+ * The wording for a refused submission-page request. Exported for tests.
+ * `head` is the start of the response body ('' if none could be read).
+ */
+export function describeSubmissionPageFailure(
+  status: number,
+  head: string,
+): string {
+  const challenge =
+    /cf-chl|challenge-platform|Just a moment|Attention Required|cf-browser-verification/i.test(
+      head,
+    );
+
+  if (challenge) {
+    return `Codeforces' bot protection blocked the request (status ${status}). Open any Codeforces page in this browser, pass the check if one is shown, then try again.`;
+  }
+
+  if (status === 403) {
+    return 'Codeforces answered "forbidden" (status 403) for this submission. It may not allow your account to view this user\'s source code.';
+  }
+
+  return `Could not load the submission page (status ${status}).`;
+}
+
+/* Longest the hidden page may take to load. */
+const FRAME_TIMEOUT_MS =
+  15_000;
+
+/*
+ * Second try for a submission page that the plain request was refused
+ * for: load the same page the way a link click would (a hidden iframe,
+ * same origin, so its document can be read) and take the source from it.
+ * Returns null when it cannot - no DOM, aborted, timed out, blocked from
+ * framing, or the page has no source - and the caller then reports the
+ * original refusal. The frame is always removed again.
+ */
+export function loadSourceInFrame(
+  url: string,
+  signal?: AbortSignal,
+  timeoutMs = FRAME_TIMEOUT_MS,
+): Promise<SubmissionSource | null> {
+  return new Promise(resolve => {
+    if (
+      typeof document ===
+        'undefined' ||
+      !document.body ||
+      signal?.aborted
+    ) {
+      resolve(null);
+
+      return;
+    }
+
+    const frame =
+      document.createElement(
+        'iframe',
+      );
+
+    frame.setAttribute(
+      'aria-hidden',
+      'true',
+    );
+
+    frame.tabIndex =
+      -1;
+
+    frame.style.cssText =
+      'position:fixed;left:-9999px;top:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
+
+    let finished =
+      false;
+
+    const finish = (
+      value: SubmissionSource | null,
+    ) => {
+      if (finished) {
+        return;
+      }
+
+      finished =
+        true;
+
+      clearTimeout(
+        timer,
+      );
+
+      signal?.removeEventListener(
+        'abort',
+        onAbort,
+      );
+
+      frame.remove();
+
+      resolve(
+        value,
+      );
+    };
+
+    const onAbort = () =>
+      finish(null);
+
+    const timer =
+      setTimeout(
+        onAbort,
+        timeoutMs,
+      );
+
+    signal?.addEventListener(
+      'abort',
+      onAbort,
+      { once: true },
+    );
+
+    frame.addEventListener(
+      'load',
+      () => {
+        try {
+          const element =
+            frame.contentDocument?.querySelector(
+              '#program-source-text',
+            );
+
+          const text =
+            element?.textContent;
+
+          finish(
+            element &&
+              text &&
+              text.trim()
+              ? {
+                  html: element.innerHTML,
+                  text,
+                }
+              : null,
+          );
+        } catch {
+          /* Not readable (blocked or cross-origin): no result. */
+          finish(null);
+        }
+      },
+    );
+
+    frame.src =
+      url;
+
+    document.body.appendChild(
+      frame,
+    );
+  });
+}
+
 export async function fetchSubmissionSourceText(
   url: string,
   signal?: AbortSignal,
@@ -800,6 +951,12 @@ export async function fetchSubmissionSourceText(
 
   let html: string;
 
+  let failure: Error | null =
+    null;
+
+  let refused =
+    false;
+
   try {
     const response =
       await fetch(
@@ -812,13 +969,65 @@ export async function fetchSubmissionSourceText(
       );
 
     if (!response.ok) {
-      throw new Error(
-        `Could not load the submission page (status ${response.status}).`,
-      );
+      /*
+       * Say what kind of refusal it was. A 403 can come from
+       * Codeforces itself (it limits who may view a submission's
+       * source) or from the bot protection in front of it, and
+       * the two need different advice; the start of the body tells
+       * them apart. The status always stays in the message.
+       */
+      let head =
+        '';
+
+      try {
+        head =
+          (
+            await response.text()
+          ).slice(
+            0,
+            4000,
+          );
+      } catch {
+        // No readable body: classified by status alone.
+      }
+
+      failure =
+        new Error(
+          describeSubmissionPageFailure(
+            response.status,
+            head,
+          ),
+        );
+
+      /* The fallback below only retries a refusal, not other failures. */
+      refused =
+        response.status ===
+        403;
+
+      throw failure;
     }
 
     html =
       await response.text();
+  } catch (error) {
+    if (
+      refused &&
+      error ===
+        failure
+    ) {
+      const viaFrame =
+        await loadSourceInFrame(
+          url,
+          signal,
+          timeoutMs,
+        );
+
+      if (viaFrame) {
+        return viaFrame;
+      }
+    }
+
+    throw error;
   } finally {
     clearTimeout(timer);
 

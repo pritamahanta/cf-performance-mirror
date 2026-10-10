@@ -30,25 +30,8 @@ export type FriendProblemEntry =
       status: 'error';
     };
 
-/*
- * Safety valve: with a very large number of
- * friends, only the first few are checked, so opening a
- * problem page can never turn into an unbounded burst of
- * API calls. This is also the batch size: the panel
- * offers a button that raises the limit by this many
- * (see `checkMore`), so every extra request is something
- * the user asked for.
- */
-export const MAX_FRIENDS_CHECKED = 30;
-
 export interface FriendProblemSubmissions {
   entries: Record<string, FriendProblemEntry>;
-
-  /* How many friends, counted from the top of the list, are being checked. */
-  limit: number;
-
-  /* Raises the limit by one batch (MAX_FRIENDS_CHECKED). */
-  checkMore: () => void;
 }
 
 /*
@@ -58,13 +41,13 @@ export interface FriendProblemSubmissions {
  *
  * Nothing runs when `problem` is null (any page that is
  * not a problem page), so other pages make no extra
- * requests at all. Calls are queued one at a time by the
+ * requests at all. Every friend is checked. Calls are queued one at a time by the
  * service layer, and results arrive progressively; the
  * friends list itself never waits on them.
  *
  * Nothing runs while `active` is false either, and turning
  * it off cancels every call still queued or in flight (the
- * queue holds up to `limit` of them, spaced out over
+ * queue can hold one per friend, spaced out over
  * several seconds, so merely ignoring their results would
  * still send them).
  */
@@ -73,13 +56,6 @@ export function useFriendProblemSubmissions(
   handles: readonly string[],
   active: boolean,
 ): FriendProblemSubmissions {
-  const [batches, setBatches] =
-    useState(1);
-
-  const limit =
-    MAX_FRIENDS_CHECKED *
-    batches;
-
   const [entries, setEntries] =
     useState<
       Record<
@@ -106,10 +82,6 @@ export function useFriendProblemSubmissions(
         ),
       ),
     )
-      .slice(
-        0,
-        limit,
-      )
       .join('\n');
 
   /*
@@ -226,14 +198,5 @@ export function useFriendProblemSubmissions(
     };
   }, [active, contestId, handlesKey]);
 
-  return {
-    entries,
-    limit,
-    checkMore: () => {
-      setBatches(
-        current =>
-          current + 1,
-      );
-    },
-  };
+  return { entries };
 }

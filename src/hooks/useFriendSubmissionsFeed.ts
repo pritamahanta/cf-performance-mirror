@@ -1,7 +1,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 
@@ -17,6 +16,13 @@ import type {
 
 import { fetchUsersInfoPaced } from '../services/codeforcesApi';
 import { loadFriendHandles } from '../services/friendsList';
+
+import {
+  loadCachedUserInfo,
+  saveCachedUserInfos,
+} from '../services/userInfoCache';
+
+import type { CachedUserInfo } from '../services/userInfoCache';
 
 import { useFriendProblemSubmissions } from './useFriendProblemSubmissions';
 
@@ -38,28 +44,24 @@ export interface FriendSubmissionsFeed {
   /* Friends with at least one submission on this problem, best first. */
   rows: FriendSubmissionRow[];
 
-  /* Friends in scope of the current check limit. */
-  inScope: number;
+  /* True until every friend has been checked (or has failed). */
+  busy: boolean;
 
-  /* Of those, how many are still being loaded / failed to load. */
-  loading: number;
+  /* Friends whose submissions could not be loaded. */
   failed: number;
-
-  limit: number;
-  checkMore: () => void;
 }
 
-interface UserInfo {
-  handle: string;
-  rank?: string;
-  rating?: number;
-}
+const NO_HANDLES: string[] = [];
 
 /*
- * Everything behind the Friends submissions box: the friends list,
- * each friend's submissions in the problem's contest (30 friends at a
- * time, see useFriendProblemSubmissions), and the rating colour of
- * the friends who actually have something to show.
+ * Everything behind the Friends submissions box: the friends list, the
+ * rating colour of every friend, and each friend's submissions in the
+ * problem's contest. Every friend is checked.
+ *
+ * The order matters for the request queue: the (few) rating requests go
+ * first, then the submissions requests, one per friend. Everything that
+ * was fetched before, in this tab or another, comes from the caches
+ * (friends list, ratings, submissions) and sends nothing.
  *
  * Nothing runs while `active` is false (feature off or box closed).
  */
@@ -107,22 +109,105 @@ export function useFriendSubmissionsFeed(
   }, [active]);
 
   const handles = useMemo(
-    () => (list.status === 'ready' ? list.handles : []),
+    () => (list.status === 'ready' ? list.handles : NO_HANDLES),
     [list],
   );
 
-  const { entries, limit, checkMore } =
-    useFriendProblemSubmissions(problem, handles, active);
+  /*
+   * A string, so the effect below depends on *which* friends there are,
+   * not on the identity of the array.
+   */
+  const handlesKey = handles.map(handle => handle.toLowerCase()).join('\n');
 
-  const scope = useMemo(
-    () => handles.slice(0, limit),
-    [handles, limit],
+  const [infos, setInfos] =
+    useState<Record<string, CachedUserInfo>>({});
+
+  /* The handles whose ratings are settled (answered, cached, or failed). */
+  const [infoFor, setInfoFor] = useState('');
+
+  useEffect(() => {
+    if (!active || handlesKey === '') {
+      return;
+    }
+
+    const wanted = handlesKey.split('\n');
+    const known: Record<string, CachedUserInfo> = {};
+    const missing: string[] = [];
+
+    for (const key of wanted) {
+      const cached = loadCachedUserInfo(key);
+
+      if (cached) {
+        known[key] = cached;
+      } else {
+        missing.push(key);
+      }
+    }
+
+    setInfos(previous => ({ ...previous, ...known }));
+
+    if (missing.length === 0) {
+      setInfoFor(handlesKey);
+
+      return;
+    }
+
+    const controller = new AbortController();
+
+    fetchUsersInfoPaced(missing, controller.signal)
+      .then(users => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const fresh: CachedUserInfo[] = users.map(user => ({
+          handle: user.handle,
+          rank: user.rank,
+          rating: user.rating,
+        }));
+
+        saveCachedUserInfos(fresh);
+
+        setInfos(previous => {
+          const next = { ...previous };
+
+          for (const info of fresh) {
+            next[info.handle.toLowerCase()] = info;
+          }
+
+          return next;
+        });
+
+        setInfoFor(handlesKey);
+      })
+      .catch(() => {
+        /* Failed or aborted. A failure only costs the colours: carry on. */
+        if (!controller.signal.aborted) {
+          setInfoFor(handlesKey);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [active, handlesKey]);
+
+  /*
+   * Submissions are requested only once the rating requests are done, so
+   * that those are not queued behind one request per friend.
+   */
+  const infoSettled = infoFor === handlesKey && handlesKey !== '';
+
+  const { entries } = useFriendProblemSubmissions(
+    problem,
+    infoSettled ? handles : NO_HANDLES,
+    active,
   );
 
-  const rowsBase = useMemo(() => {
-    const result: { handle: string; summary: FriendProblemSummary }[] = [];
+  const rows = useMemo(() => {
+    const result: FriendSubmissionRow[] = [];
 
-    for (const handle of scope) {
+    for (const handle of handles) {
       const entry = entries[handle.toLowerCase()];
 
       if (entry?.status !== 'ready') {
@@ -132,118 +217,37 @@ export function useFriendSubmissionsFeed(
       const summary = summarizeFriend(entry.submissions, problem.index);
 
       if (summary) {
-        result.push({ handle, summary });
+        const info = infos[handle.toLowerCase()];
+
+        result.push({
+          handle: info?.handle ?? handle,
+          rank: info?.rank,
+          rating: info?.rating,
+          summary,
+        });
       }
     }
 
-    return result;
-  }, [scope, entries, problem.index]);
+    return result.sort(compareSummaries);
+  }, [handles, entries, infos, problem.index]);
 
-  let loading = 0;
   let failed = 0;
+  let pending = 0;
 
-  for (const handle of scope) {
+  for (const handle of handles) {
     const status = entries[handle.toLowerCase()]?.status;
 
     if (status === 'error') {
       failed += 1;
     } else if (status !== 'ready') {
-      loading += 1;
+      pending += 1;
     }
   }
-
-  const [infos, setInfos] =
-    useState<Record<string, UserInfo>>({});
-
-  const requested = useRef<Set<string>>(new Set());
-
-  /*
-   * Ratings are asked for once a batch has finished loading, in one
-   * call per up-to-100 handles, so the rows are not recoloured one by
-   * one and the extra requests stay few. A call that fails is not
-   * retried; those handles just stay uncoloured.
-   */
-  const missingKey = loading === 0
-    ? rowsBase
-        .map(row => row.handle.toLowerCase())
-        .filter(key => !requested.current.has(key))
-        .join('\n')
-    : '';
-
-  useEffect(() => {
-    if (!active || missingKey === '') {
-      return;
-    }
-
-    const controller = new AbortController();
-    const wanted = missingKey.split('\n');
-    let answered = false;
-
-    for (const key of wanted) {
-      requested.current.add(key);
-    }
-
-    fetchUsersInfoPaced(wanted, controller.signal)
-      .then(users => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        answered = true;
-
-        setInfos(previous => {
-          const next = { ...previous };
-
-          for (const user of users) {
-            next[user.handle.toLowerCase()] = {
-              handle: user.handle,
-              rank: user.rank,
-              rating: user.rating,
-            };
-          }
-
-          return next;
-        });
-      })
-      .catch(() => {
-        /* A failed call is not retried: the handles stay uncoloured. */
-        answered = !controller.signal.aborted;
-      });
-
-    return () => {
-      controller.abort();
-
-      /* No answer yet (box closed meanwhile): ask again when it reopens. */
-      if (!answered) {
-        for (const key of wanted) {
-          requested.current.delete(key);
-        }
-      }
-    };
-  }, [active, missingKey]);
-
-  const rows = useMemo(() => {
-    const full: FriendSubmissionRow[] = rowsBase.map(row => {
-      const info = infos[row.handle.toLowerCase()];
-
-      return {
-        handle: info?.handle ?? row.handle,
-        rank: info?.rank,
-        rating: info?.rating,
-        summary: row.summary,
-      };
-    });
-
-    return full.sort(compareSummaries);
-  }, [rowsBase, infos]);
 
   return {
     list,
     rows,
-    inScope: scope.length,
-    loading,
+    busy: list.status === 'loading' || (handles.length > 0 && pending > 0),
     failed,
-    limit,
-    checkMore,
   };
 }

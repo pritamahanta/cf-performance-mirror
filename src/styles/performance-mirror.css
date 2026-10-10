@@ -257,7 +257,8 @@
 /* ---- Online Friends box (sidebar) ---- */
 
 /* Scrollable list: scrolls inside the box once it is taller than its max-height. */
-.cfpm-friends-list {
+.cfpm-friends-list,
+.cfpm-fsubs-list {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -315,21 +316,14 @@
 .cfpm-fsubs-list table.rtable { table-layout: fixed; width: 100%; }
 .cfpm-fsubs-list table.rtable td:first-child { overflow-wrap: anywhere; }
 
-.cfpm-fsubs-when { font-size: 0.85em; opacity: 0.7; line-height: 1.25; }
-
-.cfpm-fsubs-result { font-weight: 700; }
-
-.cfpm-fsubs-count,
-.cfpm-fsubs-more {
+.cfpm-fsubs-count {
   margin: 0; padding: 0; border: 0; background: none;
   font: inherit; color: inherit; cursor: pointer;
   text-decoration: underline;
   -webkit-appearance: none; appearance: none;
 }
-.cfpm-fsubs-count:hover,
-.cfpm-fsubs-more:hover { color: #3b5998; }
-.cfpm-fsubs-count:focus-visible,
-.cfpm-fsubs-more:focus-visible { outline: 2px solid rgba(59,89,152,0.6); outline-offset: 1px; }
+.cfpm-fsubs-count:hover { color: #3b5998; }
+.cfpm-fsubs-count:focus-visible { outline: 2px solid rgba(59,89,152,0.6); outline-offset: 1px; }
 
 /* Popup that lists one friend's submissions (opened from the count button). */
 #cfpm-fsub-popup-list::-webkit-scrollbar { width: 4px; }

@@ -17,7 +17,7 @@ The performance panel runs entirely client-side on `codeforces.com/profile/<hand
 
 The Online Friends panel is a separate, **opt-in** feature (off by default) that shows which of your Codeforces friends are online. Turning it on requires being logged in to Codeforces. See [Online Friends: what it does and its limits](#online-friends-what-it-does-and-its-limits) below and `PRIVACY_POLICY.md`.
 
-The Friends submissions box is a second, separate **opt-in** feature (off by default) that shows, on problem pages only, which of your Codeforces friends have submitted that problem. It does not depend on Online Friends. See [Friends submissions](#friends-submissions-problem-pages-only).
+The Friends submissions box is a second, separate **opt-in** feature (off by default) that shows, on problem pages only, which of your Codeforces friends have submitted that problem, and whether they solved it. It does not depend on Online Friends. See [Friends submissions](#friends-submissions-problem-pages-only).
 
 ## Where it appears
 - The performance panel is injected into Codeforces profile pages (URLs matching `https://codeforces.com/profile/*`).
@@ -51,23 +51,27 @@ The Friends submissions box is a second, separate **opt-in** feature (off by def
 Independent of Online Friends: it lists friends whether or not they are online.
 
 **What it requests** (all to `codeforces.com`, nothing else), only while the feature is turned on and the box is open:
-- `https://codeforces.com/friends`: your whole friend list, read with your browser's existing login session. Kept in memory for 5 minutes.
-- The `contest.status` API, once per friend, for the contest of the problem you are viewing.
-- One `user.info` request per up to 100 friends who have a submission on the problem, to colour their handles by rating. If it fails, the handles are shown uncoloured.
-- These API requests go through one queue and are spaced at about one every 2.1 seconds (Codeforces documents a limit of one API request per two seconds), so they never overlap each other.
+- `https://codeforces.com/friends`: your whole friend list, read with your browser's existing login session.
+- The `user.info` API, one request per up to 100 friends, to colour handles by rating. If it fails, the handles are shown uncoloured.
+- The `contest.status` API, once per friend, for the contest of the problem you are viewing. Every friend is checked.
+- These API requests go through one queue and are spaced at about one every 2.1 seconds (Codeforces documents a limit of one API request per two seconds), so they never overlap each other. The rating requests go first. Checking N friends therefore takes about N × 2.1 seconds the first time (103 friends: about 3.6 minutes); friends appear in the list as their results arrive.
 
 **What it shows**
-- Only friends with at least one submission on this problem. Each row shows the friend, when they solved it (contest time such as "Contest +1:02", or the date for practice submissions) or, if unsolved, their latest attempt, a Solved/Unsolved result, and the number of their submissions on this problem. Solved friends come first, earliest solve first.
-- A friend counts as "Solved" when any of their submissions to that problem has the verdict "OK". The check does not tell contest submissions from later practice ones, and does not notice an accepted solution that was hacked afterwards.
-- The count opens a list of that friend's submissions on this problem; each one opens its source code in the page.
-- Friends are checked 30 at a time, in the order of your friends page. If you have more, the box shows "Checked the first 30 of N friends." with a "Check next 30" link; each click sends at most 30 more requests. With many friends the first batch alone takes about a minute (30 requests, 2.1 s apart).
-- Submissions are requested once per friend per contest, and the result is reused for 10 minutes in that tab. There is no polling: reload the page to see a friend's newer submissions after that.
+- Only friends with at least one submission on this problem, as rows like Online Friends: a coloured dot (green = solved, red = not solved), the friend's handle, and the number of their submissions on this problem. Solved friends come first, earliest solve first. The list has a fixed maximum height and scrolls.
+- A friend counts as solved when any of their submissions to that problem has the verdict "OK". The check does not tell contest submissions from later practice ones, and does not notice an accepted solution that was hacked afterwards.
+- The count opens a list of that friend's submissions on this problem (verdict, contest time or date); each one opens its source code in the page.
 - Friends whose submissions could not be loaded are counted in a note ("N friends couldn't be checked.") and are not retried until the page is reloaded.
+
+**Caching (so reopening a problem page sends nothing)**
+- Each friend's submissions in a contest are kept in `localStorage` for 30 minutes, shared by all tabs, including an empty result. There is no polling: after 30 minutes, reload the page to see newer submissions.
+- Friends' ratings are kept in `localStorage` for 6 hours.
+- Your friends list is kept in `sessionStorage` (this tab only) for 5 minutes, per logged-in account; it is not stored when the page does not show who is logged in.
+- Failed requests are never cached.
 
 ## Privacy & security 🛡️
 - No server operated by the developer, no tracking, no ads — nothing is uploaded anywhere.
 - The performance panel uses only public Codeforces APIs and needs no login.
-- The Online Friends panel is opt-in and, once turned on, uses your existing Codeforces login session to read your own friends page; it never sees or stores your password or session token. It keeps the friend list, online status, ratings and last-activity times in `localStorage`, and both on your device. The Friends submissions box, if turned on, keeps a short-lived cache of friends' contest submissions in `sessionStorage` (this tab only). See `PRIVACY_POLICY.md` for the full list.
+- The Online Friends panel is opt-in and, once turned on, uses your existing Codeforces login session to read your own friends page; it never sees or stores your password or session token. It keeps the friend list, online status, ratings and last-activity times in `localStorage`, and both on your device. The Friends submissions box, if turned on, keeps short-lived caches of friends' contest submissions and ratings in `localStorage`, and of your friend list in `sessionStorage` (this tab only). See `PRIVACY_POLICY.md` for the full list.
 - Requires host permission for `https://codeforces.com/*` to fetch data directly. No other permissions.
 - Inspect the source before installing if you want to verify behavior — the codebase is small and self-contained.
 

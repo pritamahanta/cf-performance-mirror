@@ -7,7 +7,7 @@ const { DEFAULT_SETTINGS, normalizeSettings } = await import('../src/domain/sett
 const { toggleFriendSubmissionsExpanded, saveSettings, loadSettings } = await import(
   '../src/services/storage.ts'
 );
-const { compareSummaries, shortWhen, summarizeFriend } = await import(
+const { compareSummaries, summarizeFriend } = await import(
   '../src/domain/friendSubmissions.ts'
 );
 const { FRIENDS_LIST_TTL_MS, clearFriendsListCache, loadFriendHandles } = await import(
@@ -125,15 +125,6 @@ test('ordering: solved first (earliest solve first), then unsolved (latest attem
   );
 });
 
-test('shortWhen: contest time for contest submissions, the date otherwise', () => {
-  const date = (t: number) => `D${t}`;
-
-  assert.equal(shortWhen(sub(1, 'A', 'OK', 50, { participantType: 'CONTESTANT', contestSeconds: 3725 }), date), 'Contest +1:02');
-  assert.equal(shortWhen(sub(1, 'A', 'OK', 50, { participantType: 'VIRTUAL', contestSeconds: 60 }), date), 'Virtual +0:01');
-  assert.equal(shortWhen(sub(1, 'A', 'OK', 50, { participantType: 'PRACTICE' }), date), 'D50');
-  assert.equal(shortWhen(sub(1, 'A', 'OK', 50), date), 'D50');
-});
-
 /* ---------- friends list ---------- */
 
 beforeEach(() => clearFriendsListCache());
@@ -178,4 +169,88 @@ test('friends list: a failure is not cached', async () => {
 
   assert.deepEqual(handles, ['ok']);
   assert.equal(calls, 2);
+});
+
+test('friends list: a reload in the same tab reuses the stored copy, per account', async () => {
+  const store = new FakeStorage();
+  let calls = 0;
+  const fetcher = async () => {
+    calls += 1;
+    return ['a', 'b'];
+  };
+
+  await loadFriendHandles(undefined, fetcher, () => 1_000, store, 'Me');
+
+  clearFriendsListCache(); /* what a page reload does to memory */
+  assert.deepEqual(await loadFriendHandles(undefined, fetcher, () => 2_000, store, 'me'), ['a', 'b']);
+  assert.equal(calls, 1, 'same account (any letter case) reads the stored copy');
+
+  clearFriendsListCache();
+  await loadFriendHandles(undefined, fetcher, () => 2_000, store, 'someone-else');
+  assert.equal(calls, 2, 'another account never gets it');
+
+  clearFriendsListCache();
+  await loadFriendHandles(undefined, fetcher, () => 1_000 + FRIENDS_LIST_TTL_MS + 1, store, 'me');
+  assert.equal(calls, 3, 'expired copy is read again');
+});
+
+test('friends list: when the logged-in account is unknown nothing is stored', async () => {
+  const store = new FakeStorage();
+
+  await loadFriendHandles(undefined, async () => ['a'], () => 1_000, store, null);
+
+  assert.equal(store.length, 0);
+});
+
+/* ---------- rating cache ---------- */
+
+const { loadCachedUserInfo, saveCachedUserInfos, USER_INFO_TTL_MS } = await import(
+  '../src/services/userInfoCache.ts'
+);
+
+test('user info cache: round trip, case-insensitive, expires', () => {
+  const store = new FakeStorage();
+
+  saveCachedUserInfos([{ handle: 'Ann', rank: 'expert', rating: 1700 }, { handle: 'bob' }], store, 1_000);
+
+  assert.deepEqual(loadCachedUserInfo('ANN', store, 2_000), { handle: 'Ann', rank: 'expert', rating: 1700 });
+  assert.equal(loadCachedUserInfo('bob', store, 2_000)?.rating, undefined);
+  assert.equal(loadCachedUserInfo('nobody', store, 2_000), null);
+  assert.equal(loadCachedUserInfo('ann', store, 1_000 + USER_INFO_TTL_MS + 1), null);
+  assert.equal(store.getItem('cfpm_uinfo:ann'), null, 'expired entry is removed');
+});
+
+test('user info cache: corrupted entries are treated as missing', () => {
+  const store = new FakeStorage();
+
+  store.setItem('cfpm_uinfo:x', '{not json');
+  store.setItem('cfpm_uinfo:y', JSON.stringify({ v: 1, t: 1, i: { handle: 5 } }));
+
+  assert.equal(loadCachedUserInfo('x', store, 2), null);
+  assert.equal(loadCachedUserInfo('y', store, 2), null);
+});
+
+test('user info cache: saving a batch drops expired entries and keeps fresh ones', () => {
+  const store = new FakeStorage();
+
+  saveCachedUserInfos([{ handle: 'old' }], store, 1_000);
+  saveCachedUserInfos([{ handle: 'new' }], store, 1_000 + USER_INFO_TTL_MS + 5);
+
+  assert.equal(store.getItem('cfpm_uinfo:old'), null);
+  assert.ok(store.getItem('cfpm_uinfo:new'));
+});
+
+/* ---------- submissions cache ---------- */
+
+const { loadCachedSubmissions, saveCachedSubmissions, FRIEND_SUBMISSIONS_TTL_MS } = await import(
+  '../src/services/friendSubmissionsStore.ts'
+);
+
+test('submissions cache: an empty result is cached too, and expires after the TTL', () => {
+  const store = new FakeStorage();
+
+  saveCachedSubmissions(1, 'Ann', [], store, 1_000);
+  assert.deepEqual(loadCachedSubmissions(1, 'ann', store, 2_000), []);
+  assert.equal(loadCachedSubmissions(2, 'ann', store, 2_000), null, 'other contest');
+  assert.equal(loadCachedSubmissions(1, 'ann', store, 1_000 + FRIEND_SUBMISSIONS_TTL_MS + 1), null);
 });

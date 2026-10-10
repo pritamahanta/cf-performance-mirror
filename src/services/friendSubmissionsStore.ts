@@ -2,10 +2,11 @@ import { isFriendSubmission } from '../domain/friendSubmissions';
 import type { FriendSubmission } from '../domain/friendSubmissions';
 
 /*
- * Per-tab (sessionStorage) cache of a friend's submissions in one
- * contest. Codeforces pages are full page loads, so without this
- * every problem page of the same contest would repeat the same
- * requests for every online friend.
+ * Cache (localStorage, shared by all tabs) of a friend's submissions in
+ * one contest. Codeforces pages are full page loads, so without this
+ * every problem page of the same contest, and every reload of one,
+ * would repeat the same requests for every friend. The entries are
+ * public Codeforces data, not tied to the logged-in account.
  *
  * Everything is best-effort: storage can be unavailable or full, in
  * which case the functions quietly do nothing / return null.
@@ -13,7 +14,7 @@ import type { FriendSubmission } from '../domain/friendSubmissions';
 
 const PREFIX = 'cfpm_fsub:';
 
-export const FRIEND_SUBMISSIONS_TTL_MS = 10 * 60 * 1000;
+export const FRIEND_SUBMISSIONS_TTL_MS = 30 * 60 * 1000;
 
 /* Don't try to cache pathological (huge) entries. */
 const MAX_ENTRY_CHARS = 200_000;
@@ -59,7 +60,7 @@ export function loadCachedSubmissions(
   now: number = Date.now(),
 ): FriendSubmission[] | null {
   try {
-    const store = storage ?? sessionStorage;
+    const store = storage ?? localStorage;
     const key = keyFor(contestId, handle);
     const entry = parseEntry(store.getItem(key));
 
@@ -105,7 +106,7 @@ export function saveCachedSubmissions(
   now: number = Date.now(),
 ): void {
   try {
-    const store = storage ?? sessionStorage;
+    const store = storage ?? localStorage;
     const entry: StoredEntry = { v: 1, t: now, s: [...submissions] };
     const json = JSON.stringify(entry);
 
