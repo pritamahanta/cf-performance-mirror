@@ -66,6 +66,9 @@ import {
 /* Max width (px) of the Timings box; the table scrolls sideways inside it. */
 const TIMINGS_MAX_WIDTH = 880;
 
+/* The Problems box is a table with fixed columns, so it gets more room than the default. */
+const PROBLEMS_MAX_WIDTH = 1120;
+
 interface Props {
   engine: PerformanceEngine;
   initialSettings: ExtensionSettings;
@@ -586,6 +589,9 @@ export function PerformanceMirror({
             }
             theme={
               theme
+            }
+            maxWidth={
+              PROBLEMS_MAX_WIDTH
             }
           >
             <Controls

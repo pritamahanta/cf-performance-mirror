@@ -23,6 +23,7 @@ import {
   findLastVisitLabel,
 } from '../domain/profileLocales';
 
+import { parseSolvedCounts } from '../domain/solvedCounts';
 import { withDeadline } from './deadline';
 import { getLoggedInHandle } from './onlineStore';
 
@@ -55,6 +56,29 @@ export async function fetchContests(): Promise<
   return data.status === 'OK'
     ? (data.result ?? [])
     : [];
+}
+
+/*
+ * How many users have solved each problem, keyed "<contestId>-<index>".
+ * One call to the problemset (a large reply, so the caller caches it).
+ */
+export async function fetchProblemSolvedCounts(): Promise<
+  Record<string, number>
+> {
+  const data =
+    await get<unknown>(
+      '/problemset.problems',
+    );
+
+  if (data.status !== 'OK') {
+    throw new Error(
+      data.comment || 'unknown',
+    );
+  }
+
+  return parseSolvedCounts(
+    data.result,
+  );
 }
 
 export async function fetchUserRating(

@@ -79,6 +79,27 @@ export function sortFrictionProblems(problems: readonly ProblemEntry[], sort: 'e
     : totalErrors(b) - totalErrors(a));
 }
 
+export type SubmissionVerdictKey = 'ac' | 'wa' | 'tle' | 'rte' | 'mle' | 'other';
+
+/* Every submission recorded for one problem, each with its verdict. */
+export function getProblemSubmissions(
+  problem: Pick<ProblemEntry, 'acIds' | 'waIds' | 'tleIds' | 'rteIds' | 'mleIds' | 'otherIds'>,
+): { id: number; verdict: SubmissionVerdictKey }[] {
+  const byId = new Map<number, SubmissionVerdictKey>();
+  const add = (ids: readonly number[] | undefined, verdict: SubmissionVerdictKey) => {
+    (ids || []).forEach(id => byId.set(id, verdict));
+  };
+
+  add(problem.acIds, 'ac');
+  add(problem.waIds, 'wa');
+  add(problem.tleIds, 'tle');
+  add(problem.rteIds, 'rte');
+  add(problem.mleIds, 'mle');
+  add(problem.otherIds, 'other');
+
+  return Array.from(byId, ([id, verdict]) => ({ id, verdict }));
+}
+
 export function buildSubmissionUrl(
   submissionId: number,
   contestId: number,

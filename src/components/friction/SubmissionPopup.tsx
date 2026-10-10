@@ -20,9 +20,13 @@ function getViewedProfileHandle(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/* What each submission in `ids` was (its verdict label and badge colors), when the list mixes verdicts. */
+export type SubmissionVerdicts = Map<number, { label: string; bg: string; fg: string }>;
+
 interface Props {
   label: string;
   ids: number[];
+  verdicts?: SubmissionVerdicts;
   contestId: number;
   badgeBg: string;
   badgeFg: string;
@@ -41,7 +45,7 @@ interface Props {
 }
 
 export function SubmissionPopup({
-  label, ids, contestId, badgeBg, badgeFg, timingMap, contestMap, theme,
+  label, ids, verdicts, contestId, badgeBg, badgeFg, timingMap, contestMap, theme,
   crossContest = false, crossContestSort, anchor, problemIndex, problemName, problemContestName,
   onCrossContestSortChange, onClose,
 }: Props) {
@@ -201,7 +205,15 @@ export function SubmissionPopup({
             <>
               {icon}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 }}>
-                <span>Submission #{id}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Submission #{id}
+                  {verdicts?.get(id) && (
+                    <span style={{
+                      background: verdicts.get(id)?.bg, color: verdicts.get(id)?.fg,
+                      fontSize: 10, fontWeight: 700, borderRadius: 3, padding: '1px 6px',
+                    }}>{verdicts.get(id)?.label}</span>
+                  )}
+                </span>
                 {hasMeta && offset !== null && offset >= 0 ? (
                   <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400 }}>+{Math.round(offset * 10) / 10}m into contest</span>
                 ) : hasMeta ? (
@@ -242,7 +254,11 @@ export function SubmissionPopup({
           contestName={problemContestName}
           problemIndex={problemIndex}
           problemName={problemName}
-          verdictLabel={<span style={{ color: badgeFg }}>{label}</span>}
+          verdictLabel={
+            <span style={{ color: verdicts?.get(openedSubmission.id)?.fg ?? badgeFg }}>
+              {verdicts?.get(openedSubmission.id)?.label ?? label}
+            </span>
+          }
           theme={theme}
           onClose={() => setOpenedSubmission(null)}
         />

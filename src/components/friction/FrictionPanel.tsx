@@ -9,11 +9,14 @@ import {
   filterFrictionProblems,
   getAvailableTags,
   getFrictionProblems,
+  getProblemSubmissions,
   sortFrictionProblems,
   type FrictionFilters,
   type FrictionSource,
+  type SubmissionVerdictKey,
 } from '../../domain/friction';
-import { SubmissionPopup } from './SubmissionPopup';
+import { useProblemSolvedCounts } from '../../hooks/useProblemSolvedCounts';
+import { SubmissionPopup, type SubmissionVerdicts as PopupVerdicts } from './SubmissionPopup';
 
 interface Props {
   modeData: ModeData;
@@ -25,19 +28,8 @@ interface Props {
   onPopupSortChange: (mode: 'time' | 'contest') => void;
 }
 
-const VERDICT_CONFIG = [
-  ['wa', 'WA', 'waBadge', 'waBadgeText'],
-  ['tle', 'TLE', 'tleBg', 'tleFg'],
-  ['rte', 'RTE', 'rteBg', 'rteFg'],
-  ['mle', 'MLE', 'mleBg', 'mleFg'],
-  ['other', 'Err', 'errBg', 'errFg'],
-] as const;
-
-type VerdictKey = typeof VERDICT_CONFIG[number][0];
-type VerdictIdsKey = `${VerdictKey}Ids`;
-
-/* Height of the problem list: taller on a tall screen, never more than half the window. */
-const LIST_HEIGHT = 'min(420px, 50vh)';
+/* Height of the problem list: taller on a tall screen, never more than about two thirds of the window. */
+const LIST_HEIGHT = 'min(560px, 64vh)';
 
 export function FrictionPanel({ modeData, category, settings, theme, onSettingsChange, popupSort, onPopupSortChange }: Props) {
   const [source, setSource] = useState<FrictionSource>('category');
@@ -46,9 +38,10 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
   const [topicPickerOpen, setTopicPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [popup, setPopup] = useState<{
-    anchor: HTMLElement; label: string; ids: number[]; contestId: number; bg: string; fg: string;
+    anchor: HTMLElement; ids: number[]; verdicts: PopupVerdicts; contestId: number;
     problemIndex: string; problemName: string; problemContestName?: string;
   } | null>(null);
+  const solvedCounts = useProblemSolvedCounts();
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -129,13 +122,13 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
   };
   const maxErrors = Math.max(...sorted.map(problem => totalErrors(problem)), 1);
 
-  const openSubmission = (event: MouseEvent<HTMLElement>, label: string, ids: number[], bg: string, fg: string, contestId: number, problem: ProblemEntry) => {
+  const openSubmissions = (event: MouseEvent<HTMLElement>, ids: number[], verdicts: PopupVerdicts, problem: ProblemEntry) => {
     event.stopPropagation();
     const anchor = event.currentTarget;
     setPopup(current => current?.anchor === anchor
       ? null
       : {
-        anchor, label, ids, bg, fg, contestId,
+        anchor, ids, verdicts, contestId: problem.contestId,
         problemIndex: problem.index, problemName: problem.name, problemContestName: problem.contestName,
       });
   };
@@ -301,28 +294,35 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
                 ? 'No problems match the selected filters.'
                 : 'No problems with errors found.'}
             </div>
-          ) : sorted.map((problem, index) => (
-            <ProblemRow
-              key={`${problem.contestId}-${problem.index}`}
-              problem={problem}
-              index={index}
-              maxErrors={maxErrors}
-              theme={theme}
-              source={source}
-              hideTags={settings.hideTags}
-              hideRatings={settings.hideRatings}
-              onSubmission={openSubmission}
-            />
-          ))}
+          ) : (
+            <>
+              <ProblemsHeader theme={theme} hideRatings={settings.hideRatings} />
+              {sorted.map((problem, index) => (
+                <ProblemRow
+                  key={`${problem.contestId}-${problem.index}`}
+                  problem={problem}
+                  index={index}
+                  maxErrors={maxErrors}
+                  theme={theme}
+                  source={source}
+                  hideTags={settings.hideTags}
+                  hideRatings={settings.hideRatings}
+                  solvedBy={solvedCounts === null ? undefined : (solvedCounts[problem.pid] ?? null)}
+                  onSubmissions={openSubmissions}
+                />
+              ))}
+            </>
+          )}
         </div>
 
         {popup && (
           <SubmissionPopup
-            label={popup.label}
+            label="All"
             ids={popup.ids}
+            verdicts={popup.verdicts}
             contestId={popup.contestId}
-            badgeBg={popup.bg}
-            badgeFg={popup.fg}
+            badgeBg={theme.btnActiveBg}
+            badgeFg={theme.btnActiveText}
             timingMap={modeData.submissionTimingMap}
             contestMap={modeData.submissionContestMap}
             theme={theme}
@@ -596,6 +596,69 @@ function TopicPicker({ theme, search, setSearch, tags, availableTags, selected, 
     </div>
   );
 }
+
+/*
+ * One fixed set of columns, shared by the header and every row so they
+ * always line up - the same layout as the Codeforces problemset table:
+ * # | Name | Rating | Solved by | Submissions | Status.
+ */
+function gridColumns(hideRatings: boolean): string {
+  return hideRatings
+    ? '84px minmax(0, 1fr) 96px 112px 92px'
+    : '84px minmax(0, 1fr) 70px 96px 112px 92px';
+}
+
+/* Every submission of one problem, and what each one's verdict was. */
+function collectSubmissions(problem: ProblemEntry, theme: Theme): { ids: number[]; verdicts: PopupVerdicts } {
+  const look: Record<SubmissionVerdictKey, { label: string; bg: string; fg: string }> = {
+    ac: { label: 'AC', bg: theme.solvedBadge, fg: theme.solvedBadgeText },
+    wa: { label: 'WA', bg: theme.waBadge, fg: theme.waBadgeText },
+    tle: { label: 'TLE', bg: theme.tleBg, fg: theme.tleFg },
+    rte: { label: 'RTE', bg: theme.rteBg, fg: theme.rteFg },
+    mle: { label: 'MLE', bg: theme.mleBg, fg: theme.mleFg },
+    other: { label: 'Err', bg: theme.errBg, fg: theme.errFg },
+  };
+
+  const verdicts: PopupVerdicts = new Map();
+  getProblemSubmissions(problem).forEach(({ id, verdict }) => verdicts.set(id, look[verdict]));
+
+  return { ids: Array.from(verdicts.keys()), verdicts };
+}
+
+function ProblemsHeader({ theme, hideRatings }: { theme: Theme; hideRatings: boolean }) {
+  const cell: CSSProperties = {
+    fontSize: 12,
+    fontWeight: 700,
+    color: theme.mutedStrong,
+    whiteSpace: 'nowrap',
+  };
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: gridColumns(hideRatings),
+        alignItems: 'center',
+        columnGap: 10,
+        padding: '10px 14px 10px 17px',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1,
+        background: theme.bg,
+        borderBottom: `1px solid ${theme.borderLight}`,
+        boxSizing: 'border-box',
+      }}
+    >
+      <span style={cell}>#</span>
+      <span style={cell}>Name</span>
+      {!hideRatings && <span style={{ ...cell, textAlign: 'center' }}>Rating</span>}
+      <span style={{ ...cell, textAlign: 'center' }} title="How many Codeforces users have solved this problem">Solved by</span>
+      <span style={{ ...cell, textAlign: 'center' }}>Submissions</span>
+      <span style={{ ...cell, textAlign: 'center' }}>Status</span>
+    </div>
+  );
+}
+
 function ProblemRow({
   problem,
   index,
@@ -604,7 +667,8 @@ function ProblemRow({
   source,
   hideTags,
   hideRatings,
-  onSubmission,
+  solvedBy,
+  onSubmissions,
 }: {
   problem: ProblemEntry;
   index: number;
@@ -613,20 +677,19 @@ function ProblemRow({
   source: FrictionSource;
   hideTags: boolean;
   hideRatings: boolean;
-  onSubmission: (
+  /* undefined: not loaded yet; null: loaded but Codeforces has no figure for this problem. */
+  solvedBy: number | null | undefined;
+  onSubmissions: (
     event: MouseEvent<HTMLElement>,
-    label: string,
     ids: number[],
-    bg: string,
-    fg: string,
-    contestId: number,
+    verdicts: PopupVerdicts,
     problem: ProblemEntry
   ) => void;
 }) {
   const errors = totalErrors(problem);
   const intensity = errors / maxErrors;
 
-  const borderClr =
+  const accent =
     errors === 0
       ? '#27ae60'
       : intensity > 0.66
@@ -635,271 +698,179 @@ function ProblemRow({
           ? '#e67e22'
           : '#27ae60';
 
+  const problemUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
+  const sourceLabel = source === 'category' ? 'in-contest' : 'practice';
+  const { ids, verdicts } = collectSubmissions(problem, theme);
+  const tagText = problem.tags.slice(0, 3).join(', ') + (problem.tags.length > 3 ? ` +${problem.tags.length - 3}` : '');
+
   const rowStyle: CSSProperties = {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: gridColumns(hideRatings),
     alignItems: 'center',
-    gap: 8,
-    padding: '7px 14px',
-    borderTop: index > 0 ? `1px solid ${theme.borderLighter}` : undefined,
-    cursor: 'pointer',
-    minWidth: 0,
-    borderLeft: `3px solid ${borderClr}`,
+    columnGap: 10,
+    minHeight: 48,
+    padding: '8px 14px',
     boxSizing: 'border-box',
+    borderLeft: `3px solid ${accent}`,
+    borderTop: index > 0 ? `1px solid ${theme.borderLighter}` : undefined,
+    background: index % 2 === 1 ? (theme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)') : 'transparent',
     width: '100%',
   };
 
-  const openProblem = () =>
-    window.open(
-      `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`,
-      '_blank'
-    );
+  const link: CSSProperties = {
+    color: theme.problemLink,
+    textDecoration: 'none',
+    transition: 'opacity 0.15s ease',
+  };
 
-  const sourceLabel = source === 'category' ? 'in-contest' : 'practice';
+  const hoverOn = (event: MouseEvent<HTMLElement>) => {
+    event.currentTarget.style.textDecoration = 'underline';
+  };
+  const hoverOff = (event: MouseEvent<HTMLElement>) => {
+    event.currentTarget.style.textDecoration = 'none';
+  };
+
+  const centered: CSSProperties = { textAlign: 'center', fontSize: 12, whiteSpace: 'nowrap' };
 
   return (
-    <div style={rowStyle} onClick={openProblem}>
-      {/* Problem link */}
+    <div style={rowStyle}>
+      {/* # */}
       <a
-        href={`https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`}
+        href={problemUrl}
         target="_blank"
         rel="noopener"
-        title={problem.name}
-        style={{
-          color: theme.problemLink,
-          textDecoration: 'none',
-          fontSize: 12,
-          fontWeight: 600,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          maxWidth: 200,
-          transition: 'opacity 0.15s ease',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.textDecoration = 'underline';
-          e.currentTarget.style.opacity = '0.78';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.textDecoration = 'none';
-          e.currentTarget.style.opacity = '1';
-        }}
-        onClick={e => e.stopPropagation()}
+        title={problem.contestName || undefined}
+        style={{ ...link, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
+        onMouseEnter={hoverOn}
+        onMouseLeave={hoverOff}
       >
-        {problem.index}. {problem.name}
+        {problem.contestId}{problem.index}
       </a>
 
-      {/* Contest link */}
-      {problem.contestName ? (
+      {/* Name, with the topic tags quietly beside it */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
         <a
-          href={`https://codeforces.com/contest/${problem.contestId}`}
+          href={problemUrl}
           target="_blank"
           rel="noopener"
-          title={`Open contest: ${problem.contestName}`}
+          title={problem.name}
           style={{
-            fontSize: 10,
-            color: theme.muted,
+            ...link,
+            fontSize: 13,
+            fontWeight: 600,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            flex: '1 1 0',
+            flex: '0 1 auto',
             minWidth: 0,
-            lineHeight: 1.3,
-            textDecoration: 'none',
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.textDecoration = 'underline';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.textDecoration = 'none';
-          }}
-          onClick={e => e.stopPropagation()}
+          onMouseEnter={hoverOn}
+          onMouseLeave={hoverOff}
         >
-          {problem.contestName}
+          {problem.name}
         </a>
-      ) : (
-        <span
-          style={{
-            flex: '1 1 0',
-            minWidth: 0,
-          }}
-        />
-      )}
 
-      {/* Tags */}
-      {!hideTags && problem.tags.length > 0 && (
-        <span
-          style={{
-            display: 'flex',
-            gap: 3,
-            flexWrap: 'nowrap',
-            flexShrink: 0,
-            alignItems: 'center',
-          }}
-        >
-          {problem.tags.slice(0, 3).map(tag => (
-            <span
-              key={tag}
-              style={{
-                background: theme.isDark ? '#1e2e40' : '#e8f0fe',
-                color: theme.isDark ? '#7aabff' : '#1a56c4',
-                fontSize: 10,
-                borderRadius: 3,
-                padding: '1px 5px',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-
-          {problem.tags.length > 3 && (
-            <span
-              title={problem.tags.slice(3).join(', ')}
-              style={{
-                background: theme.isDark ? '#2e2e2e' : '#eee',
-                color: theme.muted,
-                fontSize: 10,
-                borderRadius: 3,
-                padding: '1px 5px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                cursor: 'default',
-              }}
-            >
-              +{problem.tags.length - 3}
-            </span>
-          )}
-        </span>
-      )}
+        {!hideTags && problem.tags.length > 0 && (
+          <span
+            title={problem.tags.join(', ')}
+            style={{
+              marginLeft: 'auto',
+              color: theme.muted,
+              fontSize: 11,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: '0 1 auto',
+              minWidth: 0,
+              maxWidth: '45%',
+            }}
+          >
+            {tagText}
+          </span>
+        )}
+      </div>
 
       {/* Rating */}
-      {!hideRatings && problem.rating && (
-        <span
-          style={{
-            fontSize: 11,
-            color: getRatingColor(problem.rating),
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            fontWeight: 700,
-          }}
-        >
-          ★ {problem.rating}
+      {!hideRatings && (
+        <span style={{ ...centered, fontWeight: 700, color: problem.rating ? getRatingColor(problem.rating) : theme.muted }}>
+          {problem.rating ?? '—'}
         </span>
       )}
 
-      {/* Error verdict badges */}
-      {errors > 0 &&
-        VERDICT_CONFIG.map(([key, label, bgKey, fgKey]) => {
-          const count = problem[key as VerdictKey];
-          const ids = problem[`${key}Ids` as VerdictIdsKey];
+      {/* Solved by */}
+      <span
+        style={{ ...centered, color: theme.muted }}
+        title={typeof solvedBy === 'number' ? `${solvedBy} users have solved this problem` : undefined}
+      >
+        {typeof solvedBy === 'number' ? `x${solvedBy}` : solvedBy === undefined ? '…' : '—'}
+      </span>
 
-          if (typeof count !== 'number' || count <= 0) {
-            return null;
-          }
-
-          const bg = theme[bgKey];
-          const fg = theme[fgKey];
-
-          return (
-            <span
-              key={key}
-              className="cfpm-verdict-badge"
-              style={{
-                background: bg,
-                color: fg,
-                fontSize: 10,
-                fontWeight: 700,
-                padding: '1px 6px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                cursor: ids.length ? 'pointer' : 'default',
-              }}
-              title={
-                ids.length
-                  ? `Click to view ${count} ${sourceLabel} ${label} submission${count > 1 ? 's' : ''}`
-                  : `${count} ${sourceLabel} ${label} submission${count > 1 ? 's' : ''}`
-              }
-              onClick={event => {
-                if (!ids.length) {
-                  return;
-                }
-
-                onSubmission(
-                  event,
-                  label,
-                  ids,
-                  bg,
-                  fg,
-                  problem.contestId,
-                  problem
-                );
-              }}
-            >
-              {label} ×{count}
-            </span>
-          );
-        })}
-
-      {/* Solved / unsolved */}
-      {problem.solved ? (
-        <span
+      {/* Submissions: one count, the list opens on click */}
+      <span style={{ textAlign: 'center' }}>
+        <button
+          type="button"
           className="cfpm-verdict-badge"
-          style={{
-            background: theme.solvedBadge,
-            color: theme.solvedBadgeText,
-            fontSize: 10,
-            fontWeight: 700,
-            padding: '1px 6px',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            display: 'inline-block',
-            cursor: problem.acIds.length ? 'pointer' : 'default',
-          }}
+          disabled={!ids.length}
           title={
-            problem.acIds.length
-              ? `Click to view ${problem.acIds.length} ${sourceLabel} AC submission${problem.acIds.length > 1 ? 's' : ''}`
-              : 'Solved (AC submission is outside the current time/mode filter)'
+            ids.length
+              ? `${errors} wrong, ${problem.acIds.length} accepted (${sourceLabel}) - click to view all ${ids.length}`
+              : 'No submissions to show'
           }
-          onClick={event => {
-            event.stopPropagation();
-
-            if (problem.acIds.length) {
-              onSubmission(
-                event,
-                'AC',
-                problem.acIds,
-                theme.solvedBadge,
-                theme.solvedBadgeText,
-                problem.contestId,
-                problem
-              );
-            }
-          }}
-        >
-          {errors === 0 ? '✓ AC (1st try)' : '✓ AC'}
-        </span>
-      ) : (
-        <span
-          className="cfpm-verdict-badge"
           style={{
-            background: theme.waBadge,
-            color: theme.waBadgeText,
-            fontSize: 10,
-            padding: '1px 6px',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            opacity: 0.7,
-            display: 'inline-block',
-            borderRadius: 3,
-            cursor: 'default',
+            background: theme.btnBg,
+            color: theme.problemLink,
+            border: `1px solid ${theme.btnBorder}`,
+            borderRadius: 4,
+            minWidth: 44,
+            height: 24,
+            padding: '0 10px',
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: 'inherit',
+            cursor: ids.length ? 'pointer' : 'default',
           }}
-          title="Not yet solved"
-          onClick={e => e.stopPropagation()}
+          onClick={event => onSubmissions(event, ids, verdicts, problem)}
         >
-          Unsolved
-        </span>
-      )}
+          {ids.length}
+        </button>
+      </span>
+
+      {/* Status */}
+      <span style={{ textAlign: 'center' }}>
+        {problem.solved ? (
+          <span
+            style={{
+              background: theme.solvedBadge,
+              color: theme.solvedBadgeText,
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              display: 'inline-block',
+            }}
+            title={problem.acIds.length ? 'Solved' : 'Solved (the AC submission is outside the current time/mode filter)'}
+          >
+            Solved
+          </span>
+        ) : (
+          <span
+            style={{
+              background: theme.waBadge,
+              color: theme.waBadgeText,
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              opacity: 0.7,
+              display: 'inline-block',
+            }}
+            title="Not yet solved"
+          >
+            Unsolved
+          </span>
+        )}
+      </span>
     </div>
   );
 }
