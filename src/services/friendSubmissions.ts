@@ -3,8 +3,10 @@ import type { FriendSubmission } from '../domain/friendSubmissions';
 import { fetchContestSubmissionsByHandle } from './codeforcesApi';
 import {
   loadCachedSubmissions,
+  loadStoredSubmissions,
   saveCachedSubmissions,
 } from './friendSubmissionsStore';
+import type { StoredSubmissions } from './friendSubmissionsStore';
 
 /*
  * Requests currently running in this tab, keyed by contest+handle, so
@@ -113,6 +115,18 @@ function runUnderLock(
     { signal },
     callback as unknown as LockGrantedCallback<FriendSubmission[]>,
   );
+}
+
+/*
+ * What is stored for `handle` in `contestId`, even if it is no longer up
+ * to date (up to a day old), so it can be shown at once while
+ * loadFriendContestSubmissions fetches the fresh copy. Sends nothing.
+ */
+export function peekStoredFriendSubmissions(
+  contestId: number,
+  handle: string,
+): StoredSubmissions | null {
+  return loadStoredSubmissions(contestId, handle);
 }
 
 /*

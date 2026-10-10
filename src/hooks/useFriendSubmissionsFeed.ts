@@ -9,6 +9,8 @@ import {
   summarizeFriend,
 } from '../domain/friendSubmissions';
 
+import { countUpdating } from '../domain/friendEntries';
+
 import type {
   FriendProblemSummary,
   ProblemRef,
@@ -47,8 +49,14 @@ export interface FriendSubmissionsFeed {
   /* True until every friend has been checked (or has failed). */
   busy: boolean;
 
-  /* Friends whose submissions could not be loaded. */
+  /* Friends whose submissions could not be loaded (or refreshed: their old copy stays on screen). */
   failed: number;
+
+  /*
+   * Friends shown from an old stored copy whose fresh request has not
+   * returned yet. The box marks these as updating.
+   */
+  updating: number;
 
   /*
    * Friends whose submissions request has settled (ready or failed),
@@ -206,10 +214,15 @@ export function useFriendSubmissionsFeed(
    */
   const infoSettled = infoFor === handlesKey && handlesKey !== '';
 
+  /*
+   * Stored copies are shown as soon as the friends are known; only the
+   * requests wait for the ratings.
+   */
   const { entries } = useFriendProblemSubmissions(
     problem,
-    infoSettled ? handles : NO_HANDLES,
+    handles,
     active,
+    infoSettled,
   );
 
   const rows = useMemo(() => {
@@ -243,11 +256,11 @@ export function useFriendSubmissionsFeed(
   let pending = 0;
 
   for (const handle of handles) {
-    const status = entries[handle.toLowerCase()]?.status;
+    const entry = entries[handle.toLowerCase()];
 
-    if (status === 'error') {
+    if (entry?.status === 'error' || (entry?.status === 'ready' && entry.stale === 'failed')) {
       failed += 1;
-    } else if (status !== 'ready') {
+    } else if (entry?.status !== 'ready') {
       pending += 1;
     }
   }
@@ -257,6 +270,7 @@ export function useFriendSubmissionsFeed(
     rows,
     busy: list.status === 'loading' || (handles.length > 0 && pending > 0),
     failed,
+    updating: countUpdating(entries, handles),
     checked: handles.length - pending,
   };
 }

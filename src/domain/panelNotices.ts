@@ -57,6 +57,11 @@ export function submissionsLoadingMessage(checked: number, total: number): strin
     : SUBMISSIONS_LOADING_MESSAGE;
 }
 
+/* Shown in the footer while old results are on screen and being refreshed. */
+export function updatingLabel(left: number): string {
+  return `Updating\u2026 ${left} left`;
+}
+
 export function noSubmissionsMessage(checked: number): string {
   return checked === 1
     ? 'The friend checked has no submissions on this problem.'

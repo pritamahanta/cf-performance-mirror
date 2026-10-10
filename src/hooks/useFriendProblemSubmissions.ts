@@ -5,33 +5,30 @@ import {
 } from 'react';
 
 import type {
-  FriendSubmission,
   ProblemRef,
 } from '../domain/friendSubmissions';
 
 import {
+  applyFailure,
+  applyFresh,
+  applyRequested,
+  applyStored,
+} from '../domain/friendEntries';
+
+import type {
+  FriendEntries,
+  FriendProblemEntry,
+} from '../domain/friendEntries';
+
+import {
   loadFriendContestSubmissions,
+  peekStoredFriendSubmissions,
 } from '../services/friendSubmissions';
 
-export type FriendProblemEntry =
-  | {
-      status: 'loading';
-    }
-  | {
-      status: 'ready';
-      /*
-       * Everything the friend submitted in this problem's
-       * contest (all problems); the caller narrows it to
-       * the current problem.
-       */
-      submissions: FriendSubmission[];
-    }
-  | {
-      status: 'error';
-    };
+export type { FriendProblemEntry };
 
 export interface FriendProblemSubmissions {
-  entries: Record<string, FriendProblemEntry>;
+  entries: FriendEntries;
 }
 
 /*
@@ -45,6 +42,16 @@ export interface FriendProblemSubmissions {
  * service layer, and results arrive progressively; the
  * friends list itself never waits on them.
  *
+ * Old results are shown first: whatever is stored for a friend,
+ * even when it is no longer up to date, appears at once (marked
+ * `stale: 'updating'`) and is replaced when that friend's fresh
+ * request returns. Showing it sends nothing, and the requests made
+ * are exactly the ones that were made before: only friends whose
+ * stored copy is not up to date are asked again.
+ *
+ * `fetching` lets the caller hold the requests back (while ratings
+ * are still being fetched, say) without delaying the stored copies.
+ *
  * Nothing runs while `active` is false either, and turning
  * it off cancels every call still queued or in flight (the
  * queue can hold one per friend, spaced out over
@@ -55,14 +62,10 @@ export function useFriendProblemSubmissions(
   problem: ProblemRef | null,
   handles: readonly string[],
   active: boolean,
+  fetching: boolean = true,
 ): FriendProblemSubmissions {
   const [entries, setEntries] =
-    useState<
-      Record<
-        string,
-        FriendProblemEntry
-      >
-    >({});
+    useState<FriendEntries>({});
 
   const contestId =
     problem
@@ -70,7 +73,7 @@ export function useFriendProblemSubmissions(
       : null;
 
   /*
-   * A string, so the effect below depends on *which*
+   * A string, so the effects below depend on *which*
    * friends are online, not on the identity of the array
    * (the list is rebuilt on every 60s refresh).
    */
@@ -121,6 +124,45 @@ export function useFriendProblemSubmissions(
     };
   }, [active]);
 
+  /* Stored copies first: no request, so it is instant. */
+  useEffect(() => {
+    if (
+      !active ||
+      contestId === null ||
+      handlesKey === ''
+    ) {
+      return;
+    }
+
+    const found: Array<[string, NonNullable<ReturnType<typeof peekStoredFriendSubmissions>>]> = [];
+
+    for (const handle of handlesKey.split('\n')) {
+      const stored =
+        peekStoredFriendSubmissions(
+          contestId,
+          handle,
+        );
+
+      if (stored) {
+        found.push([handle, stored]);
+      }
+    }
+
+    if (found.length === 0) {
+      return;
+    }
+
+    setEntries(previous => {
+      let next = previous;
+
+      for (const [handle, stored] of found) {
+        next = applyStored(next, handle, stored);
+      }
+
+      return next;
+    });
+  }, [active, contestId, handlesKey]);
+
   useEffect(() => {
     const signal =
       controllerRef.current
@@ -128,6 +170,7 @@ export function useFriendProblemSubmissions(
 
     if (
       !active ||
+      !fetching ||
       !signal ||
       contestId === null ||
       handlesKey === ''
@@ -142,17 +185,7 @@ export function useFriendProblemSubmissions(
       '\n',
     )) {
       setEntries(previous =>
-        previous[handle]
-          ?.status ===
-        'ready'
-          ? previous
-          : {
-              ...previous,
-              [handle]: {
-                status:
-                  'loading',
-              },
-            },
+        applyRequested(previous, handle),
       );
 
       loadFriendContestSubmissions(
@@ -165,15 +198,8 @@ export function useFriendProblemSubmissions(
             return;
           }
 
-          setEntries(
-            previous => ({
-              ...previous,
-              [handle]: {
-                status:
-                  'ready',
-                submissions,
-              },
-            }),
+          setEntries(previous =>
+            applyFresh(previous, handle, submissions),
           );
         })
         .catch(() => {
@@ -181,14 +207,8 @@ export function useFriendProblemSubmissions(
             return;
           }
 
-          setEntries(
-            previous => ({
-              ...previous,
-              [handle]: {
-                status:
-                  'error',
-              },
-            }),
+          setEntries(previous =>
+            applyFailure(previous, handle),
           );
         });
     }
@@ -196,7 +216,7 @@ export function useFriendProblemSubmissions(
     return () => {
       cancelled = true;
     };
-  }, [active, contestId, handlesKey]);
+  }, [active, fetching, contestId, handlesKey]);
 
   return { entries };
 }

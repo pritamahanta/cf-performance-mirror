@@ -8,6 +8,7 @@ import {
   failedNote,
   noSubmissionsMessage,
   submissionsLoadingMessage,
+  updatingLabel,
 } from '../../domain/panelNotices';
 
 import { useFriendSubmissionsFeed } from '../../hooks/useFriendSubmissionsFeed';
@@ -82,11 +83,14 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
    * x / t with submissions: x is how many friends have a submission,
    * t is how many of the (known) friends have been checked so far -
    * so the count stays accurate (not just "x with submissions") while
-   * the scan is still running, not only once it finishes.
+   * the scan is still running, not only once it finishes. While old
+   * results are on screen and being refreshed, it says so instead.
    */
   const footerLabel =
     feed.list.status === 'ready' && totalFriends > 0
-      ? `${feed.rows.length} / ${feed.checked} with submissions`
+      ? feed.updating > 0
+        ? updatingLabel(feed.updating)
+        : `${feed.rows.length} / ${feed.checked} with submissions`
       : '\u00a0';
 
   return (
@@ -205,7 +209,7 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
             </div>
           )}
 
-          {feed.list.status === 'ready' && feed.failed > 0 && !feed.busy && feed.rows.length > 0 && (
+          {feed.list.status === 'ready' && feed.failed > 0 && !feed.busy && feed.updating === 0 && feed.rows.length > 0 && (
             <div style={{ ...NOTE_STYLE, opacity: 0.7 }}>{failedNote(feed.failed)}</div>
           )}
 
