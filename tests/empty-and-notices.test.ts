@@ -10,10 +10,12 @@ import {
   NONE_ONLINE_MESSAGE,
   NO_FRIENDS_MESSAGE,
   SLOW_SCAN_NOTE,
+  SUBMISSIONS_LOADING_MESSAGE,
   emptyListMessage,
   failedNote,
   listNotes,
   noSubmissionsMessage,
+  submissionsLoadingMessage,
 } from '../src/domain/panelNotices.ts';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -192,6 +194,14 @@ test('notices: friends-submissions wording', () => {
   assert.equal(noSubmissionsMessage(30), 'None of the 30 friends checked has submitted this problem.');
   assert.equal(failedNote(1), "1 friend couldn't be checked.");
   assert.equal(failedNote(3), "3 friends couldn't be checked.");
+});
+
+test('notices: friends-submissions loading message counts up as friends are checked', () => {
+  assert.equal(submissionsLoadingMessage(0, 40), 'Loading friends’ submissions… 0/40 checked');
+  assert.equal(submissionsLoadingMessage(12, 40), 'Loading friends’ submissions… 12/40 checked');
+  assert.equal(submissionsLoadingMessage(40, 40), 'Loading friends’ submissions… 40/40 checked');
+  /* Total not known yet (list still loading): falls back to the plain message. */
+  assert.equal(submissionsLoadingMessage(0, 0), SUBMISSIONS_LOADING_MESSAGE);
 });
 
 test('notices: every applicable list note is shown, in order', () => {

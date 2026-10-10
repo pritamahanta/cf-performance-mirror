@@ -46,6 +46,17 @@ export const LIST_LOADING_MESSAGE = 'Loading your friends\u2026';
 
 export const SUBMISSIONS_LOADING_MESSAGE = 'Loading friends\u2019 submissions\u2026';
 
+/*
+ * The loading message once the friends list is known, with a running
+ * count so the box visibly updates as each friend's request comes back
+ * instead of sitting on the same text until every friend is done.
+ */
+export function submissionsLoadingMessage(checked: number, total: number): string {
+  return total > 0
+    ? `Loading friends\u2019 submissions\u2026 ${checked}/${total} checked`
+    : SUBMISSIONS_LOADING_MESSAGE;
+}
+
 export function noSubmissionsMessage(checked: number): string {
   return checked === 1
     ? 'The friend checked has no submissions on this problem.'

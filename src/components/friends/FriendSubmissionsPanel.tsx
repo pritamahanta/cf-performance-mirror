@@ -5,9 +5,9 @@ import type { ProblemRef } from '../../domain/friendSubmissions';
 import {
   LIST_LOADING_MESSAGE,
   NO_FRIENDS_MESSAGE,
-  SUBMISSIONS_LOADING_MESSAGE,
   failedNote,
   noSubmissionsMessage,
+  submissionsLoadingMessage,
 } from '../../domain/panelNotices';
 
 import { useFriendSubmissionsFeed } from '../../hooks/useFriendSubmissionsFeed';
@@ -121,7 +121,7 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
           {feed.list.status === 'ready' && totalFriends > 0 && feed.rows.length === 0 && (
             <div style={MESSAGE_STYLE}>
               {feed.busy
-                ? SUBMISSIONS_LOADING_MESSAGE
+                ? submissionsLoadingMessage(feed.checked, totalFriends)
                 : feed.failed === totalFriends
                   ? failedNote(feed.failed)
                   : noSubmissionsMessage(totalFriends - feed.failed)}

@@ -49,6 +49,14 @@ export interface FriendSubmissionsFeed {
 
   /* Friends whose submissions could not be loaded. */
   failed: number;
+
+  /*
+   * Friends whose submissions request has settled (ready or failed),
+   * out of `list.handles.length` once the list is known. Lets the box
+   * show a running count while `busy` is true, instead of a static
+   * message until everyone is done.
+   */
+  checked: number;
 }
 
 const NO_HANDLES: string[] = [];
@@ -249,5 +257,6 @@ export function useFriendSubmissionsFeed(
     rows,
     busy: list.status === 'loading' || (handles.length > 0 && pending > 0),
     failed,
+    checked: handles.length - pending,
   };
 }
