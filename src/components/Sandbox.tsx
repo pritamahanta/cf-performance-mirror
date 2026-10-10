@@ -12,6 +12,8 @@ interface Props {
   theme: Theme;
   /* Widest the box may get (px). */
   maxWidth?: number;
+  /* Shortest the box may be (px) - it still grows taller for more content. */
+  minHeight?: number;
   onClose: () => void;
   children: ReactNode;
 }
@@ -30,6 +32,7 @@ export function Sandbox({
   label,
   theme,
   maxWidth = 980,
+  minHeight,
   onClose,
   children,
 }: Props) {
@@ -76,6 +79,7 @@ export function Sandbox({
     margin: 'auto',
     width: '100%',
     maxWidth,
+    minHeight,
     boxSizing: 'border-box',
     borderRadius: 6,
     boxShadow: '0 12px 36px rgba(0,0,0,0.35)',

@@ -24,6 +24,18 @@ type PopupState = {
   fg: string;
 };
 
+/*
+ * The same Codeforces problemset-table look the Problems box uses
+ * (see tableLook() in FrictionPanel.tsx) - kept as its own small copy
+ * here rather than a shared import, so the two boxes don't need to be
+ * touched together for an unrelated change in either one.
+ */
+function tableLook(theme: Theme) {
+  return theme.isDark
+    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText }
+    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20' };
+}
+
 export function PerformanceTable({
   modeData,
   category,
@@ -33,6 +45,7 @@ export function PerformanceTable({
   onPopupSortChange,
 }: Props) {
   const model = buildTableModel(modeData, category);
+  const look = tableLook(theme);
   const [popup, setPopup] = useState<PopupState | null>(null);
 
   const openPopup = (
@@ -75,8 +88,9 @@ export function PerformanceTable({
             <th
               style={{
                 textAlign: 'left',
-                padding: '5px 12px',
-                borderBottom: `2px solid ${theme.borderLight}`,
+                padding: '8px 12px',
+                background: look.head,
+                borderBottom: `1px solid ${look.line}`,
                 verticalAlign: 'middle',
               }}
             >
@@ -148,11 +162,12 @@ export function PerformanceTable({
                 key={index}
                 style={{
                   textAlign: 'center',
-                  padding: '5px 14px',
+                  padding: '8px 14px',
                   fontWeight: 700,
                   fontSize: 13,
                   color: theme.tableHeaderText,
-                  borderBottom: `2px solid ${theme.borderLight}`,
+                  background: look.head,
+                  borderBottom: `1px solid ${look.line}`,
                 }}
               >
                 {index}
@@ -162,11 +177,11 @@ export function PerformanceTable({
         </thead>
 
         <tbody>
-          <tr>
+          <tr style={{ background: look.zebra }}>
             <td
               style={{
                 textAlign: 'left',
-                padding: '9px 16px',
+                padding: '11px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -181,11 +196,11 @@ export function PerformanceTable({
                 key={cell.index}
                 style={{
                   textAlign: 'center',
-                  padding: '9px 16px',
+                  padding: '11px 16px',
                   fontSize: 13,
                   color: theme.accentBlue,
                   fontWeight: 700,
-                  borderTop: `1px solid ${theme.borderLighter}`,
+                  borderTop: `1px solid ${look.line}`,
                 }}
               >
                 {cell.averageTime ?? '—'}
@@ -197,7 +212,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '9px 16px',
+                padding: '11px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -212,11 +227,11 @@ export function PerformanceTable({
                 key={cell.index}
                 style={{
                   textAlign: 'center',
-                  padding: '9px 16px',
+                  padding: '11px 16px',
                   fontSize: 13,
                   color: '#6b4fa0',
                   fontWeight: 700,
-                  borderTop: `1px solid ${theme.borderLighter}`,
+                  borderTop: `1px solid ${look.line}`,
                 }}
               >
                 {cell.medianTime ?? '—'}
@@ -224,11 +239,11 @@ export function PerformanceTable({
             ))}
           </tr>
 
-          <tr>
+          <tr style={{ background: look.zebra }}>
             <td
               style={{
                 textAlign: 'left',
-                padding: '9px 16px',
+                padding: '11px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -245,6 +260,8 @@ export function PerformanceTable({
                   : String(cell.solved);
 
               const clickable = cell.acIds.length > 0;
+              /* Same green Codeforces gives a solved problem on its own tables. */
+              const solved = cell.solved > 0;
 
               return (
                 <td
@@ -258,17 +275,20 @@ export function PerformanceTable({
                   }
                   style={{
                     textAlign: 'center',
-                    padding: '9px 16px',
+                    padding: '11px 16px',
                     fontSize: 13,
                     color:
                       cell.attempts > 0 && cell.solved === 0
                         ? '#e74c3c'
-                        : theme.tableCellText,
+                        : solved
+                          ? look.solvedText
+                          : theme.tableCellText,
                     fontWeight:
-                      cell.attempts > 0 && cell.solved === 0
+                      cell.attempts > 0 && cell.solved === 0 || solved
                         ? 700
                         : undefined,
-                    borderTop: `1px solid ${theme.borderLighter}`,
+                    background: solved ? look.solved : undefined,
+                    borderTop: `1px solid ${look.line}`,
                     cursor: clickable ? 'pointer' : 'default',
                     textDecoration: clickable ? 'underline' : undefined,
                     textDecorationStyle: clickable ? 'dotted' : undefined,
@@ -302,7 +322,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '9px 16px',
+                padding: '11px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -320,10 +340,10 @@ export function PerformanceTable({
                   key={cell.index}
                   style={{
                     textAlign: 'center',
-                    padding: '9px 16px',
+                    padding: '11px 16px',
                     fontSize: 13,
                     color: theme.tableCellText,
-                    borderTop: `1px solid ${theme.borderLighter}`,
+                    borderTop: `1px solid ${look.line}`,
                     cursor: clickable ? 'pointer' : 'default',
                     textDecoration: clickable ? 'underline' : undefined,
                     textDecorationStyle: clickable ? 'dotted' : undefined,
@@ -351,11 +371,11 @@ export function PerformanceTable({
             })}
           </tr>
 
-          <tr>
+          <tr style={{ background: look.zebra }}>
             <td
               style={{
                 textAlign: 'left',
-                padding: '9px 16px',
+                padding: '11px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -380,10 +400,10 @@ export function PerformanceTable({
                   key={cell.index}
                   style={{
                     textAlign: 'center',
-                    padding: '9px 16px',
+                    padding: '11px 16px',
                     fontSize: 13,
                     color,
-                    borderTop: `1px solid ${theme.borderLighter}`,
+                    borderTop: `1px solid ${look.line}`,
                   }}
                 >
                   {cell.failurePercent === null
