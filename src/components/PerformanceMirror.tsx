@@ -64,7 +64,7 @@ import {
 } from './friction/FrictionPanel';
 
 /* Max width (px) of the Timings box; the table scrolls sideways inside it. */
-const TIMINGS_MAX_WIDTH = 720;
+const TIMINGS_MAX_WIDTH = 880;
 
 interface Props {
   engine: PerformanceEngine;

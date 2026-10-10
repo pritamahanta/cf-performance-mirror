@@ -166,7 +166,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '6px 14px',
+                padding: '9px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -181,7 +181,7 @@ export function PerformanceTable({
                 key={cell.index}
                 style={{
                   textAlign: 'center',
-                  padding: '6px 14px',
+                  padding: '9px 16px',
                   fontSize: 13,
                   color: theme.accentBlue,
                   fontWeight: 700,
@@ -197,7 +197,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '6px 14px',
+                padding: '9px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -212,7 +212,7 @@ export function PerformanceTable({
                 key={cell.index}
                 style={{
                   textAlign: 'center',
-                  padding: '6px 14px',
+                  padding: '9px 16px',
                   fontSize: 13,
                   color: '#6b4fa0',
                   fontWeight: 700,
@@ -228,7 +228,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '6px 14px',
+                padding: '9px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -258,7 +258,7 @@ export function PerformanceTable({
                   }
                   style={{
                     textAlign: 'center',
-                    padding: '6px 14px',
+                    padding: '9px 16px',
                     fontSize: 13,
                     color:
                       cell.attempts > 0 && cell.solved === 0
@@ -302,7 +302,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '6px 14px',
+                padding: '9px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -320,7 +320,7 @@ export function PerformanceTable({
                   key={cell.index}
                   style={{
                     textAlign: 'center',
-                    padding: '6px 14px',
+                    padding: '9px 16px',
                     fontSize: 13,
                     color: theme.tableCellText,
                     borderTop: `1px solid ${theme.borderLighter}`,
@@ -355,7 +355,7 @@ export function PerformanceTable({
             <td
               style={{
                 textAlign: 'left',
-                padding: '6px 14px',
+                padding: '9px 16px',
                 fontSize: 11,
                 color: theme.muted,
                 fontWeight: 600,
@@ -380,7 +380,7 @@ export function PerformanceTable({
                   key={cell.index}
                   style={{
                     textAlign: 'center',
-                    padding: '6px 14px',
+                    padding: '9px 16px',
                     fontSize: 13,
                     color,
                     borderTop: `1px solid ${theme.borderLighter}`,

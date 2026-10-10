@@ -29,7 +29,7 @@ export function Sandbox({
   title,
   label,
   theme,
-  maxWidth = 820,
+  maxWidth = 980,
   onClose,
   children,
 }: Props) {

@@ -36,8 +36,8 @@ const VERDICT_CONFIG = [
 type VerdictKey = typeof VERDICT_CONFIG[number][0];
 type VerdictIdsKey = `${VerdictKey}Ids`;
 
-/* Height (px) of the problem list; same as the Friends submissions list. */
-const LIST_HEIGHT = 260;
+/* Height of the problem list: taller on a tall screen, never more than half the window. */
+const LIST_HEIGHT = 'min(420px, 50vh)';
 
 export function FrictionPanel({ modeData, category, settings, theme, onSettingsChange, popupSort, onPopupSortChange }: Props) {
   const [source, setSource] = useState<FrictionSource>('category');
@@ -293,7 +293,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
         )}
 
         <div className="cfpm-list-scroll" style={{
-          flex: `0 0 ${LIST_HEIGHT}px`, overflowY: 'auto', height: LIST_HEIGHT, width: '100%', boxSizing: 'border-box',
+          flex: `0 0 ${LIST_HEIGHT}`, overflowY: 'auto', height: LIST_HEIGHT, width: '100%', boxSizing: 'border-box',
         }}>
           {!sorted.length ? (
             <div style={{ padding: '24px 14px', color: theme.emptyText, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>

@@ -71,43 +71,25 @@ const TOGGLES: Array<{
   key: ToggleKey;
   label: string;
   noun: string;
-  icon: ReactNode;
 }> = [
   {
     key: 'friendsVisible',
     label: 'Friends',
     noun: 'the Online Friends box in the sidebar',
-    icon: (
-      <Icon>
-        <circle cx="6" cy="5.2" r="2.2" />
-        <path d="M1.6 13.2c0-2.4 1.9-3.8 4.4-3.8s4.4 1.4 4.4 3.8" />
-        <circle cx="12.1" cy="6.1" r="1.7" />
-        <path d="M10.3 9.2c1.8 0.3 3.1 1.5 3.1 4" />
-      </Icon>
-    ),
   },
   {
     key: 'friendSubmissionsVisible',
     label: 'Submissions',
     noun: 'the Friends submissions box (problem pages)',
-    icon: (
-      <Icon>
-        <path d="M5.5 3.5h8" />
-        <path d="M5.5 8h8" />
-        <path d="M5.5 12.5h8" />
-        <path d="M1.8 3.5l.8.8 1.4-1.6" />
-        <path d="M1.8 8l.8.8 1.4-1.6" />
-        <path d="M1.8 12.5l.8.8 1.4-1.6" />
-      </Icon>
-    ),
   },
 ];
 
 /*
- * The profile card's buttons. Timings and Problems open their own box
- * over the page (each carrying the Div / time-or-contest / total-or-rated
- * filters); Friends and Submissions switch the two sidebar boxes on or
- * off, and say so in the label next to them.
+ * The profile card's one row. Left: Timings and Problems, which open
+ * their own box over the page (each carrying the Div /
+ * time-or-contest / total-or-rated filters). Right: the two sidebar
+ * boxes (Friends, Submissions) as quiet switches - a dot that is lit
+ * while the box is on.
  */
 export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
   return (
@@ -116,68 +98,88 @@ export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
       style={{
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: 7,
-        margin: '12px 0',
+        gap: 8,
+        margin: '10px 0 0',
       }}
     >
-      {VIEWS.map(({ view, label, hint, icon }) => (
-        <button
-          key={view}
-          type="button"
-          className="cfpm-pill-btn"
-          title={hint}
-          style={{
-            gap: 6,
-            background: theme.btnBg,
-            color: theme.btnText,
-            border: `1px solid ${theme.btnBorder}`,
-          }}
-          onClick={() => onOpen(view)}
-        >
-          {icon}
-          <span>{label}</span>
-        </button>
-      ))}
-
-      <span
-        style={{
-          marginLeft: 8,
-          fontSize: 11,
-          color: theme.muted,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Sidebar boxes:
-      </span>
-
-      {TOGGLES.map(({ key, label, noun, icon }) => {
-        const on = settings[key];
-
-        return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        {VIEWS.map(({ view, label, hint, icon }) => (
           <button
-            key={key}
+            key={view}
             type="button"
-            className={`cfpm-pill-btn ${on ? 'active' : ''}`}
-            title={`${on ? 'On' : 'Off'}: ${noun}. Click to turn ${on ? 'off' : 'on'}.`}
-            aria-pressed={on}
+            className="cfpm-pill-btn"
+            title={hint}
             style={{
               gap: 6,
-              background: on ? theme.btnActiveBg : theme.btnBg,
-              color: on ? theme.btnActiveText : theme.muted,
-              border: `1px solid ${on ? theme.btnActiveBorder : theme.btnBorder}`,
+              background: theme.btnBg,
+              color: theme.btnText,
+              border: `1px solid ${theme.btnBorder}`,
             }}
-            onClick={() => {
-              const patch: Partial<ExtensionSettings> = {};
-              patch[key] = !on;
-              onChange(patch);
-            }}
+            onClick={() => onOpen(view)}
           >
             {icon}
             <span>{label}</span>
           </button>
-        );
-      })}
+        ))}
+      </div>
+
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        role="group"
+        aria-label="Sidebar boxes"
+      >
+        <span
+          style={{
+            marginRight: 2,
+            fontSize: 11,
+            color: theme.muted,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Sidebar
+        </span>
+
+        {TOGGLES.map(({ key, label, noun }) => {
+          const on = settings[key];
+
+          return (
+            <button
+              key={key}
+              type="button"
+              className="cfpm-pill-btn"
+              title={`${on ? 'On' : 'Off'}: ${noun}. Click to turn ${on ? 'off' : 'on'}.`}
+              aria-pressed={on}
+              style={{
+                gap: 7,
+                background: 'transparent',
+                color: on ? theme.text : theme.muted,
+                border: `1px solid ${theme.btnBorder}`,
+              }}
+              onClick={() => {
+                const patch: Partial<ExtensionSettings> = {};
+                patch[key] = !on;
+                onChange(patch);
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  boxSizing: 'border-box',
+                  flexShrink: 0,
+                  background: on ? '#27ae60' : 'transparent',
+                  border: `1.5px solid ${on ? '#27ae60' : theme.muted}`,
+                }}
+              />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
