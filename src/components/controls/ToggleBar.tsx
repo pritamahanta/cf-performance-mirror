@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { ExtensionSettings } from '../../types/settings';
 import type { Theme } from '../../domain/theme';
@@ -33,6 +35,102 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
+/*
+ * A button that explains itself on hover or keyboard focus. The text is a
+ * bubble rendered over the page (not inside the card, whose body clips
+ * anything that sticks out), so it is never cut off.
+ */
+const TIP_WIDTH = 260;
+
+function TipButton({
+  tip,
+  theme,
+  children,
+  onClick,
+  ...rest
+}: {
+  tip: string;
+  theme: Theme;
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  onClick: () => void;
+  'aria-pressed'?: boolean;
+}) {
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+
+  const show = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const room = window.innerWidth - TIP_WIDTH - 8;
+
+    setAt({
+      left: Math.max(8, Math.min(rect.left, room)),
+      top: rect.bottom + 6,
+    });
+  };
+
+  const hide = () => setAt(null);
+
+  /* A fixed bubble would be left behind if the page scrolls under it. */
+  useEffect(() => {
+    if (!at) {
+      return;
+    }
+
+    window.addEventListener('scroll', hide, { capture: true, passive: true });
+
+    return () => window.removeEventListener('scroll', hide, true);
+  }, [at]);
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={tip}
+        onMouseEnter={event => show(event.currentTarget)}
+        onMouseLeave={hide}
+        onFocus={event => show(event.currentTarget)}
+        onBlur={hide}
+        onClick={() => {
+          /* The window it opens covers the button; the bubble must not linger. */
+          hide();
+          onClick();
+        }}
+        {...rest}
+      >
+        {children}
+      </button>
+
+      {at &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{
+              position: 'fixed',
+              left: at.left,
+              top: at.top,
+              width: TIP_WIDTH,
+              boxSizing: 'border-box',
+              zIndex: 999999,
+              pointerEvents: 'none',
+              padding: '7px 10px',
+              borderRadius: 5,
+              fontSize: 12,
+              lineHeight: 1.45,
+              fontFamily: theme.fontFamily,
+              background: theme.isDark ? '#e8e8e8' : '#2b2b2b',
+              color: theme.isDark ? '#1a1a1a' : '#f5f5f5',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.28)',
+            }}
+          >
+            {tip}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 const VIEWS: Array<{
   view: 'timings' | 'problems';
   label: string;
@@ -42,7 +140,7 @@ const VIEWS: Array<{
   {
     view: 'timings',
     label: 'Timings',
-    hint: 'Open: average and median solve time for each problem letter',
+    hint: 'Opens a window with your average and median solve time for each problem letter (A, B, C…).',
     icon: (
       <Icon>
         <rect x="1" y="2" width="14" height="12" rx="1.5" />
@@ -55,7 +153,7 @@ const VIEWS: Array<{
   {
     view: 'problems',
     label: 'Problems',
-    hint: 'Open: the problems you got errors on, with their submissions',
+    hint: 'Opens a window listing the problems you got errors on, with filters and the submissions behind each count.',
     icon: (
       <Icon>
         <path d="M3.5 1.5h6l3 3v10h-9z" />
@@ -75,12 +173,12 @@ const TOGGLES: Array<{
   {
     key: 'friendsVisible',
     label: 'Friends',
-    noun: 'the Online Friends box in the sidebar',
+    noun: 'the Online Friends box in the right sidebar of Codeforces pages (who is online now)',
   },
   {
     key: 'friendSubmissionsVisible',
     label: 'Submissions',
-    noun: 'the Friends submissions box (problem pages)',
+    noun: 'the Friends submissions box on problem pages (which friends submitted that problem)',
   },
 ];
 
@@ -106,11 +204,11 @@ export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
         {VIEWS.map(({ view, label, hint, icon }) => (
-          <button
+          <TipButton
             key={view}
-            type="button"
+            tip={hint}
+            theme={theme}
             className="cfpm-pill-btn"
-            title={hint}
             style={{
               gap: 6,
               background: theme.btnBg,
@@ -121,7 +219,7 @@ export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
           >
             {icon}
             <span>{label}</span>
-          </button>
+          </TipButton>
         ))}
       </div>
 
@@ -145,11 +243,11 @@ export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
           const on = settings[key];
 
           return (
-            <button
+            <TipButton
               key={key}
-              type="button"
+              theme={theme}
+              tip={`${label} is ${on ? 'on' : 'off'}: ${noun}. Click to turn it ${on ? 'off' : 'on'}.`}
               className="cfpm-pill-btn"
-              title={`${on ? 'On' : 'Off'}: ${noun}. Click to turn ${on ? 'off' : 'on'}.`}
               aria-pressed={on}
               style={{
                 gap: 7,
@@ -176,7 +274,7 @@ export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
                 }}
               />
               <span>{label}</span>
-            </button>
+            </TipButton>
           );
         })}
       </div>
