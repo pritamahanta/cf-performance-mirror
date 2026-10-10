@@ -140,7 +140,7 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
                       &nbsp;
                     </th>
                     <th>User</th>
-                    <th style={{ width: '3.25em' }}>Subs</th>
+                    <th style={{ width: '3.25em' }} title="Submissions on this problem">Subs</th>
                   </tr>
 
                   {feed.rows.map((row, index) => {

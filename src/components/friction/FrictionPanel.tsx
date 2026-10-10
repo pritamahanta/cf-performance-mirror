@@ -631,7 +631,7 @@ function collectSubmissions(problem: ProblemEntry, theme: Theme): { ids: number[
     tle: { label: 'TLE', bg: theme.tleBg, fg: theme.tleFg },
     rte: { label: 'RTE', bg: theme.rteBg, fg: theme.rteFg },
     mle: { label: 'MLE', bg: theme.mleBg, fg: theme.mleFg },
-    other: { label: 'Err', bg: theme.errBg, fg: theme.errFg },
+    other: { label: 'Error', bg: theme.errBg, fg: theme.errFg },
   };
 
   const verdicts: PopupVerdicts = new Map();
@@ -834,7 +834,7 @@ function ProblemRow({
 
       {/* Status: a solved row's cell is filled green, like Codeforces' solved marker */}
       <span
-        title={problem.solved ? (problem.acIds.length ? 'Solved' : 'Solved (the AC submission is outside the current time/mode filter)') : 'Not yet solved'}
+        title={problem.solved ? (problem.acIds.length ? 'Solved' : "Solved (but that accepted submission isn't included in the dates or contest type you're currently viewing)") : 'Not yet solved'}
         style={{
           alignSelf: 'stretch',
           margin: '-4px 0',

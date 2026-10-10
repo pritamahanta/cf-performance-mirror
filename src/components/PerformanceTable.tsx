@@ -276,7 +276,7 @@ export function PerformanceTable({
                   }}
                   title={
                     cell.acIds.length
-                      ? `Click to view ${cell.acIds.length} AC submissions for problem ${cell.index}`
+                      ? `Click to view ${cell.acIds.length} accepted submission${cell.acIds.length !== 1 ? 's' : ''} for problem ${cell.index}`
                       : cell.attempts > 0 && cell.solved === 0
                         ? `Never solved — ${cell.attempts} submission${cell.attempts !== 1 ? 's' : ''}`
                         : undefined
