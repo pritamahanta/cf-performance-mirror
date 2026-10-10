@@ -29,55 +29,6 @@ import {
 const LIST_MAX_HEIGHT =
   260;
 
-function timeAgoLabel(
-  updatedAt: number,
-): string {
-  const seconds =
-    Math.max(
-      0,
-      Math.round(
-        (Date.now() -
-          updatedAt) /
-          1000,
-      ),
-    );
-
-  if (
-    seconds < 5
-  ) {
-    return 'just now';
-  }
-
-  if (
-    seconds < 60
-  ) {
-    return `${seconds}s ago`;
-  }
-
-  return `${Math.round(
-    seconds / 60,
-  )}m ago`;
-}
-
-function RefreshIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="23 4 23 10 17 10" />
-      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-    </svg>
-  );
-}
-
 export function OnlineFriendsPanel() {
   const {
     enabled,
@@ -97,22 +48,10 @@ export function OnlineFriendsPanel() {
 
   const {
     state,
-    refreshing,
-    refresh,
   } =
     useOnlineFriends(
       active,
     );
-
-  const refreshTitle =
-    refreshing
-      ? 'Refreshing\u2026'
-      : state.status ===
-          'ready'
-        ? `Updated ${timeAgoLabel(
-            state.updatedAt,
-          )} \u00b7 Refresh`
-        : 'Refresh';
 
   const countLabel =
     state.status ===
@@ -148,8 +87,8 @@ export function OnlineFriendsPanel() {
    * an approximation of it.
    *
    * Below the (scrollable) list sits a fixed
-   * footer row: cfpm mark + refresh button on the
-   * left, online count on the right.
+   * footer row: cfpm mark on the left, online
+   * count on the right.
    */
   return (
     <div className="roundbox sidebox borderTopRound">
@@ -389,38 +328,6 @@ export function OnlineFriendsPanel() {
       <div className="cfpm-friends-footer">
         <div className="cfpm-friends-footer-group">
           <CfpmMark />
-
-          <button
-            type="button"
-            className={
-              refreshing
-                ? 'cfpm-friends-refresh cfpm-spinning'
-                : 'cfpm-friends-refresh'
-            }
-            onClick={() => {
-              /*
-               * Always call refresh(): the poller itself already
-               * decides what a click means depending on what's
-               * going on (nothing running yet, a scan already in
-               * flight, too soon after the last one, ...) and
-               * always acknowledges it. Gating this on a "busy"
-               * flag used to silently swallow clicks made while
-               * the very first load was still in progress - which
-               * is exactly what "the button ignores my click"
-               * looks like.
-               */
-              refresh();
-            }}
-            title={
-              refreshTitle
-            }
-            aria-label="Refresh online friends"
-            aria-busy={
-              refreshing
-            }
-          >
-            <RefreshIcon />
-          </button>
         </div>
 
         <span className="cfpm-friends-count">
