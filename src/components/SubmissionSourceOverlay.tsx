@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 
@@ -11,6 +12,8 @@ import type {
 import { createPortal } from 'react-dom';
 
 import { fetchSubmissionSourceText } from '../services/codeforcesApi';
+import { highlight } from '../domain/highlight';
+import type { TokenType } from '../domain/highlight';
 import type { Theme } from '../domain/theme';
 
 interface Props {
@@ -33,17 +36,55 @@ interface Props {
   onClose: () => void;
 }
 
+/*
+ * Token colors of the Codeforces source view (measured from a screenshot
+ * of it): navy keywords, purple types, dark-red comments, green strings,
+ * teal numbers, olive punctuation. Keywords, types, comments and strings
+ * are bold there; numbers, punctuation and plain text are not.
+ */
+const CODEFORCES_CODE_COLORS: Record<TokenType, string> = {
+  pln: '#000',
+  kwd: '#008',
+  typ: '#606',
+  com: '#800',
+  str: '#080',
+  lit: '#066',
+  pun: '#660',
+};
+
+/* Codeforces has no dark theme; these are lighter stand-ins for a dark page. */
+const DARK_CODE_COLORS: Record<TokenType, string> = {
+  pln: '#e6e6e6',
+  kwd: '#8ab4ff',
+  typ: '#d9a0ff',
+  com: '#ff9a8a',
+  str: '#7bd88f',
+  lit: '#6fd6d6',
+  pun: '#d4d48a',
+};
+
+const BOLD_TOKENS: ReadonlySet<TokenType> = new Set<TokenType>([
+  'kwd',
+  'typ',
+  'com',
+  'str',
+]);
+
 type LoadState =
   | { status: 'loading' }
   | { status: 'ready'; html: string; text: string }
   | { status: 'error'; message: string };
 
 /*
- * A submission's source code shown as an in-page overlay - a dimmed
- * backdrop with a centered box and a cross button to close it - the
- * same way Codeforces itself shows a submission's source in its own
- * "view source" dialog, instead of opening the submission's page in
- * a new tab.
+ * A submission's source code shown as an in-page overlay, laid out and
+ * colored like Codeforces' own "view source" dialog (white box with a
+ * grey border, one-line header, grey code box, syntax colors), instead
+ * of opening the submission's page in a new tab. It closes with the
+ * cross, a click outside the box, or Escape.
+ *
+ * The syntax colors come from highlight(): the page Codeforces serves
+ * holds the source as plain text and colors it with a script in the
+ * browser, so the fetched copy carries no color markup to reuse.
  */
 export function SubmissionSourceOverlay({
   url,
@@ -63,6 +104,18 @@ export function SubmissionSourceOverlay({
 
   const [copied, setCopied] =
     useState(false);
+
+  const tokens =
+    useMemo(
+      () =>
+        state.status ===
+        'ready'
+          ? highlight(
+              state.text,
+            )
+          : [],
+      [state],
+    );
 
   useEffect(() => {
     const controller =
@@ -156,57 +209,91 @@ export function SubmissionSourceOverlay({
       });
   };
 
+  const light =
+    !theme.isDark;
+
+  const colors =
+    light
+      ? CODEFORCES_CODE_COLORS
+      : DARK_CODE_COLORS;
+
+  const ruleColor =
+    light
+      ? '#9a9a9a'
+      : theme.dropdownBorder;
+
+  /*
+   * No dimming behind the box: the Codeforces dialog does not dim the
+   * page (measured from a screenshot of it). Clicking outside still
+   * closes it.
+   */
   const backdropStyle: CSSProperties =
     {
       position: 'fixed',
       inset: 0,
       zIndex: 999999,
       background:
-        'rgba(0,0,0,0.5)',
+        'transparent',
       display: 'flex',
-      alignItems: 'center',
+      alignItems:
+        'flex-start',
       justifyContent:
         'center',
-      padding: 16,
+      padding: '12px 6px',
       boxSizing:
         'border-box',
     };
 
+  /*
+   * Measured from the Codeforces dialog: 3px #ccc border, rounded
+   * corners, 22px padding all round, nearly the full width of the
+   * window, 12px from its top. It grows with the code up to the window
+   * height and then scrolls inside.
+   */
   const boxStyle: CSSProperties =
     {
       position: 'relative',
       width: '100%',
-      maxWidth: 820,
-      maxHeight: '85vh',
+      maxHeight:
+        'calc(100vh - 24px)',
       boxSizing:
         'border-box',
       display: 'flex',
       flexDirection:
         'column',
+      padding: 22,
       borderRadius: 6,
-      overflow: 'hidden',
+      border: `3px solid ${light ? '#ccc' : theme.dropdownBorder}`,
       boxShadow:
-        '0 12px 36px rgba(0,0,0,0.35)',
+        '0 0 24px rgba(0,0,0,0.45)',
       background:
-        theme.dropdownBg,
-      border: `1px solid ${theme.dropdownBorder}`,
-      color: theme.text,
+        light
+          ? '#fff'
+          : theme.dropdownBg,
+      color:
+        light
+          ? '#000'
+          : theme.text,
       fontFamily:
-        theme.fontFamily,
+        light
+          ? 'Arial, Helvetica, sans-serif'
+          : theme.fontFamily,
+      fontSize: 12,
     };
 
   const linkStyle: CSSProperties =
     {
       color:
-        theme.problemLink,
+        light
+          ? '#00f'
+          : theme.problemLink,
       textDecoration:
-        'none',
+        'underline',
       cursor: 'pointer',
       background: 'none',
       border: 0,
       padding: 0,
       font: 'inherit',
-      fontWeight: 600,
     };
 
   const problemLabel =
@@ -243,100 +330,122 @@ export function SubmissionSourceOverlay({
           style={{
             position:
               'absolute',
-            top: 8,
-            right: 10,
+            top: 6,
+            right: 2,
+            width: 18,
+            height: 18,
             background:
               'transparent',
             border: 0,
-            padding: 4,
+            padding: 0,
             cursor:
               'pointer',
-            opacity: 0.55,
+            fontFamily:
+              'Arial, Helvetica, sans-serif',
             fontSize: 18,
-            lineHeight: 1,
+            lineHeight:
+              '18px',
+            textAlign:
+              'center',
             color:
-              theme.text,
+              light
+                ? '#b2b2b2'
+                : theme.muted,
           }}
         >
-          {'✕'}
+          {'×'}
         </button>
 
         <div
           style={{
-            padding:
-              '14px 42px 12px 16px',
-            fontSize: 13,
-            lineHeight: 1.5,
-            borderBottom: `1px solid ${theme.dropdownBorder}`,
-            flexShrink: 0,
-          }}
-        >
-          {'By '}
-          <strong>
-            {handle}
-          </strong>
-
-          {contestName && (
-            <>
-              {', contest: '}
-              {contestName}
-            </>
-          )}
-
-          {problemLabel && (
-            <>
-              {', problem: '}
-              {problemLabel}
-            </>
-          )}
-
-          {', '}
-          <strong>
-            {verdictLabel}
-          </strong>
-
-          {', '}
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener"
-            title={`Submission #${submissionId}`}
-            style={linkStyle}
-          >
-            {'#'}
-          </a>
-
-          {state.status ===
-            'ready' && (
-            <>
-              {', '}
-              <button
-                type="button"
-                onClick={
-                  copySource
-                }
-                style={
-                  linkStyle
-                }
-              >
-                {copied
-                  ? 'Copied'
-                  : 'Copy'}
-              </button>
-            </>
-          )}
-        </div>
-
-        <div
-          style={{
-            overflow: 'auto',
             flex: '1 1 auto',
-            background:
-              theme.isDark
-                ? 'rgba(255,255,255,0.03)'
-                : '#ffffff',
+            minHeight: 0,
+            overflowY:
+              'auto',
+            padding:
+              '0 12px',
           }}
         >
+          <div
+            style={{
+              paddingTop: 12,
+              marginLeft: -1,
+              lineHeight:
+                '14px',
+            }}
+          >
+            {'By '}
+            <strong>
+              {handle}
+            </strong>
+
+            {contestName && (
+              <>
+                {', contest: '}
+                {contestName}
+              </>
+            )}
+
+            {problemLabel && (
+              <>
+                {', problem: '}
+                {problemLabel}
+              </>
+            )}
+
+            {', '}
+            <strong>
+              {verdictLabel}
+            </strong>
+
+            {', '}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener"
+              title={`Submission #${submissionId}`}
+              style={
+                light
+                  ? {
+                      textDecoration:
+                        'underline',
+                    }
+                  : linkStyle
+              }
+            >
+              {'#'}
+            </a>
+
+            {state.status ===
+              'ready' && (
+              <>
+                {', '}
+                <button
+                  type="button"
+                  onClick={
+                    copySource
+                  }
+                  style={
+                    linkStyle
+                  }
+                >
+                  {copied
+                    ? 'Copied'
+                    : 'Copy'}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div
+            style={{
+              margin:
+                '6px 0 6px',
+              borderTop: `1px solid ${ruleColor}`,
+              borderBottom: `1px solid ${light ? '#eee' : ruleColor}`,
+            }}
+          />
+
           {state.status ===
             'loading' && (
             <div
@@ -393,37 +502,67 @@ export function SubmissionSourceOverlay({
           {state.status ===
             'ready' && (
             /*
-             * dangerouslySetInnerHTML, not text: `state.html` is
-             * Codeforces' own innerHTML for #program-source-text,
-             * carrying its own syntax-highlighting spans. Rendered
-             * directly (not re-escaped into plain text) so those
-             * spans keep their class names and pick up Codeforces'
-             * own, already-loaded stylesheet - the same colors the
-             * real "view source" dialog shows, not a guessed
-             * approximation. The source text itself arrives from
-             * Codeforces already HTML-escaped inside those spans
-             * (see fetchSubmissionSourceText), so this never runs
-             * anything from the submitted code itself.
+             * Built from highlight()'s tokens as React text and spans
+             * (never as HTML), so nothing in the submitted code is
+             * ever interpreted as markup. Measured from the
+             * Codeforces source view: 13px monospace, grey #eff0f1 box, no
+             * padding.
              */
             <pre
               style={{
                 margin: 0,
-                padding:
-                  '12px 16px',
+                padding: 0,
+                background:
+                  light
+                    ? '#eff0f1'
+                    : 'rgba(255,255,255,0.06)',
+                color:
+                  colors.pln,
                 fontFamily:
-                  'Consolas, Menlo, Monaco, "Courier New", monospace',
-                fontSize: 12.5,
-                lineHeight: 1.5,
+                  'monospace',
+                fontSize: 13,
+                lineHeight:
+                  'normal',
                 whiteSpace:
                   'pre',
-                color:
-                  theme.text,
+                overflowX:
+                  'auto',
               }}
-              dangerouslySetInnerHTML={{
-                __html:
-                  state.html,
-              }}
-            />
+            >
+              {tokens.map(
+                (
+                  token,
+                  index,
+                ) =>
+                  token.type ===
+                  'pln' ? (
+                    token.text
+                  ) : (
+                    <span
+                      key={
+                        index
+                      }
+                      style={{
+                        color:
+                          colors[
+                            token
+                              .type
+                          ],
+                        fontWeight:
+                          BOLD_TOKENS.has(
+                            token.type,
+                          )
+                            ? 'bold'
+                            : undefined,
+                      }}
+                    >
+                      {
+                        token.text
+                      }
+                    </span>
+                  ),
+              )}
+            </pre>
           )}
         </div>
       </div>
