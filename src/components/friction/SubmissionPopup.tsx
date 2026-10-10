@@ -184,6 +184,9 @@ export function SubmissionPopup({
             textDecoration: 'none',
             color: url ? theme.problemLink : theme.muted,
             fontSize: 12, fontWeight: 600,
+            /* Rows are <button>s: without this the browser's default button border (the dark frame) shows on every side. */
+            border: 0, margin: 0, boxSizing: 'border-box',
+            WebkitAppearance: 'none', appearance: 'none',
             borderTop: index > 0 ? `1px solid ${theme.borderLighter}` : undefined,
             background,
             cursor: url ? 'pointer' : 'default',
