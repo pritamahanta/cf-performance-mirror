@@ -78,9 +78,15 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
 
   const totalFriends = feed.list.status === 'ready' ? feed.list.handles.length : 0;
 
+  /*
+   * x / t with submissions: x is how many friends have a submission,
+   * t is how many of the (known) friends have been checked so far -
+   * so the count stays accurate (not just "x with submissions") while
+   * the scan is still running, not only once it finishes.
+   */
   const footerLabel =
     feed.list.status === 'ready' && totalFriends > 0
-      ? `${feed.rows.length} with submissions`
+      ? `${feed.rows.length} / ${feed.checked} with submissions`
       : '\u00a0';
 
   return (
