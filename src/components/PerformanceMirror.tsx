@@ -66,9 +66,6 @@ import {
 /* Max width (px) of the Timings box; the table scrolls sideways inside it. */
 const TIMINGS_MAX_WIDTH = 960;
 
-/* Shortest the Timings box may be (px), so it doesn't look cramped next to the Problems box. */
-const TIMINGS_MIN_HEIGHT = 480;
-
 /* The Problems box is a table with fixed columns, so it gets more room than the default. */
 const PROBLEMS_MAX_WIDTH = 1120;
 
@@ -529,9 +526,6 @@ export function PerformanceMirror({
             }
             maxWidth={
               TIMINGS_MAX_WIDTH
-            }
-            minHeight={
-              TIMINGS_MIN_HEIGHT
             }
           >
             <Controls

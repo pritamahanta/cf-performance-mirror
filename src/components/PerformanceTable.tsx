@@ -32,8 +32,8 @@ type PopupState = {
  */
 function tableLook(theme: Theme) {
   return theme.isDark
-    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText }
-    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20' };
+    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg }
+    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff' };
 }
 
 export function PerformanceTable({
@@ -260,7 +260,6 @@ export function PerformanceTable({
                   : String(cell.solved);
 
               const clickable = cell.acIds.length > 0;
-              /* Same green Codeforces gives a solved problem on its own tables. */
               const solved = cell.solved > 0;
 
               return (
@@ -280,14 +279,11 @@ export function PerformanceTable({
                     color:
                       cell.attempts > 0 && cell.solved === 0
                         ? '#e74c3c'
-                        : solved
-                          ? look.solvedText
-                          : theme.tableCellText,
+                        : theme.tableCellText,
                     fontWeight:
                       cell.attempts > 0 && cell.solved === 0 || solved
                         ? 700
                         : undefined,
-                    background: solved ? look.solved : undefined,
                     borderTop: `1px solid ${look.line}`,
                     cursor: clickable ? 'pointer' : 'default',
                     textDecoration: clickable ? 'underline' : undefined,
