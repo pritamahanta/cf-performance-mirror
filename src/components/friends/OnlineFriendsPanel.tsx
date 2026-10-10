@@ -139,14 +139,34 @@ export function OnlineFriendsPanel() {
 
       {expanded && (
         <>
+      {/*
+       * Fixed height, not a max-height: whether the box is loading,
+       * empty, or showing 1 friend or 50, it always takes up exactly
+       * this much room, so the rest of the Codeforces page never
+       * shifts as friends come online, go offline, or the scan
+       * finishes. Only the list inside it scrolls.
+       */}
+      <div
+        style={{
+          height: LIST_MAX_HEIGHT,
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
       {state.status ===
         'loading' && (
         <div
           style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             padding:
               '0.75em 1em',
             textAlign:
               'center',
+            boxSizing: 'border-box',
           }}
         >
           {state.progress
@@ -159,10 +179,15 @@ export function OnlineFriendsPanel() {
         'error' && (
         <div
           style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             padding:
               '0.75em 1em',
             textAlign:
               'center',
+            boxSizing: 'border-box',
           }}
         >
           {state.message}
@@ -176,10 +201,15 @@ export function OnlineFriendsPanel() {
           0 && (
         <div
           style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             padding:
               '0.75em 1em',
             textAlign:
               'center',
+            boxSizing: 'border-box',
           }}
         >
           {emptyListMessage(
@@ -196,8 +226,8 @@ export function OnlineFriendsPanel() {
         <div
           className="cfpm-list-scroll cfpm-friends-list"
           style={{
-            maxHeight:
-              LIST_MAX_HEIGHT,
+            flex: 1,
+            minHeight: 0,
           }}
         >
           <table className="rtable">
@@ -300,6 +330,7 @@ export function OnlineFriendsPanel() {
           </table>
         </div>
       )}
+      </div>
 
       {state.status ===
         'ready' &&
