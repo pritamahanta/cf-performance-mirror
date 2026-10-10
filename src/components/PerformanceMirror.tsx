@@ -461,6 +461,19 @@ export function PerformanceMirror({
 
         {settings.tableVisible && (
           <div className="cfpm-table-scroll">
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                color: theme.muted,
+                padding: '2px 12px 6px',
+              }}
+            >
+              Contest performance
+            </div>
+
             <PerformanceTable
               modeData={
                 modeData

@@ -146,6 +146,19 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
       style={{ marginTop: 10, borderTop: `1px solid ${theme.borderLight}`, paddingTop: 10 }}
     >
       <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: theme.muted,
+          padding: '0 2px 6px',
+        }}
+      >
+        Problem attempts
+      </div>
+
+      <div
         className="cfpm-friction-scrollbox"
         style={{
           overflow: overflowOpen ? 'visible' : 'hidden',
@@ -199,6 +212,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <div ref={filterRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <MenuButton
+                label="Filter"
                 title={activeFilter ? filterTitle(settings) : 'Filter'}
                 active={openMenu === 'filter' || activeFilter}
                 theme={theme}
@@ -235,6 +249,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
 
             <div ref={sortRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <MenuButton
+                label="Sort"
                 title={sort === 'rating' ? 'Sort: by rating' : 'Sort: by errors'}
                 active={openMenu === 'sort' || sort === 'rating'}
                 theme={theme}
@@ -252,6 +267,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
 
             <div ref={viewRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <MenuButton
+                label="View"
                 title={viewTitle(settings)}
                 active={openMenu === 'view' || activeView}
                 theme={theme}
@@ -352,21 +368,23 @@ function viewTitle(settings: ExtensionSettings) {
   return parts.length ? parts.join(' · ') : 'View options';
 }
 
-function MenuButton({ theme, active, title, icon, onClick }: {
-  theme: Theme; active: boolean; title: string; icon: ReactNode; onClick: () => void;
+function MenuButton({ theme, active, title, icon, label, onClick }: {
+  theme: Theme; active: boolean; title: string; icon: ReactNode; label?: string; onClick: () => void;
 }) {
   return (
     <button
-      className="cfpm-icon-btn"
+      className={label ? 'cfpm-pill-btn' : 'cfpm-icon-btn'}
       title={title}
       style={{
         background: active ? theme.btnActiveBg : theme.btnBg,
         color: active ? theme.btnActiveText : theme.muted,
         border: `1px solid ${active ? theme.btnActiveBorder : theme.btnBorder}`,
+        gap: label ? 6 : 0,
       }}
       onClick={event => { event.stopPropagation(); onClick(); }}
     >
       {icon}
+      {label && <span>{label}</span>}
     </button>
   );
 }

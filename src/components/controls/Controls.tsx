@@ -116,6 +116,8 @@ export function Controls({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          rowGap: 8,
           gap: 10,
           margin: '12px 0',
           minHeight: 36,
@@ -169,12 +171,13 @@ export function Controls({
           style={{
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            rowGap: 8,
             gap: 7,
-            flexShrink: 0,
           }}
         >
           <button
-            className={`cfpm-icon-btn ${settings.tableVisible
+            className={`cfpm-pill-btn ${settings.tableVisible
               ? 'active'
               : ''
               }`}
@@ -184,6 +187,7 @@ export function Controls({
                 : 'Show stats table'
             }
             style={{
+              gap: 6,
               background:
                 settings.tableVisible
                   ? theme.btnActiveBg
@@ -226,10 +230,11 @@ export function Controls({
               <path d="M1 10h14" />
               <path d="M5.5 6v8" />
             </svg>
+            <span>Table</span>
           </button>
 
           <button
-            className={`cfpm-icon-btn ${settings.friendsVisible
+            className={`cfpm-pill-btn ${settings.friendsVisible
               ? 'active'
               : ''
               }`}
@@ -239,6 +244,7 @@ export function Controls({
                 : 'Show online friends'
             }
             style={{
+              gap: 6,
               background:
                 settings.friendsVisible
                   ? theme.btnActiveBg
@@ -275,10 +281,11 @@ export function Controls({
               <circle cx="12.1" cy="6.1" r="1.7" />
               <path d="M10.3 9.2c1.8 0.3 3.1 1.5 3.1 4" />
             </svg>
+            <span>Friends</span>
           </button>
 
           <button
-            className={`cfpm-icon-btn ${settings.friendSubmissionsVisible
+            className={`cfpm-pill-btn ${settings.friendSubmissionsVisible
               ? 'active'
               : ''
               }`}
@@ -288,6 +295,7 @@ export function Controls({
                 : 'Show friends submissions'
             }
             style={{
+              gap: 6,
               background:
                 settings.friendSubmissionsVisible
                   ? theme.btnActiveBg
@@ -326,6 +334,7 @@ export function Controls({
               <path d="M1.8 8l.8.8 1.4-1.6" />
               <path d="M1.8 12.5l.8.8 1.4-1.6" />
             </svg>
+            <span>Submissions</span>
           </button>
 
           <TimelineSelector
