@@ -16,11 +16,12 @@ requires no login and no authentication of any kind. Your filter and display
 preferences, including whether the Online Friends panel and the Friends submissions
 box are turned on and open, are saved in your browser's `localStorage`.
 
-## Online Friends panel (opt-in, off by default)
+## Online Friends panel (on by default, can be turned off)
 
 This panel shows which of your Codeforces friends are currently online. It
-is off until you turn it on, and it only works while you are logged in to
-Codeforces in your browser. When enabled:
+is on by default and can be turned off with the Friends button in the
+profile page's controls. It only works while you are logged in to
+Codeforces in your browser. While it is on:
 
 - It loads `https://codeforces.com/friends` using your browser's existing
   Codeforces login session, the same way the site itself would if you
@@ -50,13 +51,13 @@ What is stored on your device:
 - Turning the panel off does not retroactively delete already-stored data;
   clear your browser's site data for `codeforces.com` to remove it.
 
-## Friends submissions box (opt-in, off by default)
+## Friends submissions box (on by default, can be turned off)
 
 On problem pages of regular contests (not gym contests) this box shows which
 of your friends have submitted the problem you are viewing. It is separate
-from the Online Friends panel, is off until you turn it on, and only works
-while you are logged in to Codeforces. When enabled, and while its box is
-open:
+from the Online Friends panel, is on by default (the Submissions button in
+the profile page's controls turns it off), and only works while you are
+logged in to Codeforces. While it is on and its box is open:
 
 - It loads `https://codeforces.com/friends` using your browser's existing
   Codeforces login session, as described above, to get your friends'

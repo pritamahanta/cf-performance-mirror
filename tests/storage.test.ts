@@ -74,15 +74,15 @@ test('toggleFriendsVisible: flips back on a second call', () => {
   assert.equal(loadSettings(storage).friendsVisible, false);
 });
 
-test('toggleFriendsVisible: starting from nothing saved at all defaults to off, then flips on', () => {
+test('toggleFriendsVisible: starting from nothing saved at all defaults to on, then flips off', () => {
   // No prior saveSettings call: storage is empty, same as a user who
   // has never touched this setting (normalizeSettings must supply
   // every other field's default, not just leave them undefined).
   const result = toggleFriendsVisible(storage);
-  assert.equal(result, true);
+  assert.equal(result, false);
 
   const saved = loadSettings(storage);
-  assert.equal(saved.friendsVisible, true);
+  assert.equal(saved.friendsVisible, false);
   assert.equal(saved.category, 'Div4', "normalizeSettings' default, not undefined");
 });
 

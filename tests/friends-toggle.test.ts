@@ -49,12 +49,12 @@ beforeEach(() => {
 
 /* ---------- settings: the two flags ---------- */
 
-test('defaults: master switch off, box open', () => {
-  assert.equal(DEFAULT_SETTINGS.friendsVisible, false);
+test('defaults: master switch on, box open', () => {
+  assert.equal(DEFAULT_SETTINGS.friendsVisible, true);
   assert.equal(DEFAULT_SETTINGS.friendsExpanded, true);
 
   const fresh = normalizeSettings({});
-  assert.equal(fresh.friendsVisible, false);
+  assert.equal(fresh.friendsVisible, true);
   assert.equal(fresh.friendsExpanded, true);
 });
 
@@ -103,7 +103,7 @@ test('toggleFriendsExpanded: from nothing saved, the default open box closes', (
   assert.equal(toggleFriendsExpanded(storage), false);
   const saved = loadSettings(storage);
   assert.equal(saved.friendsExpanded, false);
-  assert.equal(saved.friendsVisible, false, 'master switch stays at its default');
+  assert.equal(saved.friendsVisible, true, 'master switch stays at its default');
 });
 
 test('toggleFriendsVisible: flips only the master switch and leaves the box flag alone', () => {

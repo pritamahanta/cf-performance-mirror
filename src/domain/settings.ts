@@ -5,23 +5,21 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   category: 'Div4', mode: 'total', timeline: 'all', sortMode: 'errors',
   hideAC: false, hideTags: false, hideRatings: false, solvedOnly: false,
   minAttempts: 1, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
+  tagFilters: [], customContestFrom: '', customContestTo: '',
   /*
-   * Timings (tableVisible) and Problems (problemsVisible) are panels opened
-   * from their own buttons; both start closed so the card is just the buttons.
-   */
-  tagFilters: [], tableVisible: false, problemsVisible: false, customContestFrom: '', customContestTo: '',
-  /*
-   * Off by default: it reads the user's own authenticated /friends page
-   * (see fetchOnlineFriends) and stores the result in localStorage. An
-   * existing user who updates has no `friendsVisible` key saved yet, so
-   * they fall through to this default too (see normalizeSettings below)
-   * - it must opt them in explicitly, not turn this on for them silently.
+   * On by default. This is the master switch (the Friends button in the
+   * profile page's controls): while it is off the Online Friends box is
+   * not rendered at all and makes no requests. While it is on the box
+   * reads the user's own authenticated /friends page (see
+   * fetchOnlineFriends) and stores the result in localStorage. A
+   * logged-out visitor makes that one request and the box then shows
+   * its "make sure you're logged in" message.
    *
-   * This is the master switch (the people-icon button in the profile page's
-   * controls): while it is off the Online Friends box is not rendered at
-   * all and makes no requests.
+   * An existing user who updates has no `friendsVisible` key saved yet,
+   * so normalizeSettings gives them this default too: the box turns on
+   * for them, and the privacy policy says so.
    */
-  friendsVisible: false,
+  friendsVisible: true,
   /*
    * The Online Friends box's own open/closed state (its header chevron),
    * which only matters while the master switch above is on. Closed keeps
@@ -32,12 +30,12 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   /*
    * Friends submissions box (problem pages only), independent of the
    * Online Friends box above. Same two-flag pattern: the master switch
-   * is the profile controls' button and is OFF by default, because it
-   * reads the user's authenticated /friends page and sends Codeforces API
-   * requests; the expanded flag is the box's own chevron on the problem
-   * page.
+   * is the profile controls' Submissions button and is ON by default
+   * (it reads the user's authenticated /friends page and sends
+   * Codeforces API requests while on); the expanded flag is the box's
+   * own chevron on the problem page.
    */
-  friendSubmissionsVisible: false,
+  friendSubmissionsVisible: true,
   friendSubmissionsExpanded: true,
 };
 
@@ -59,8 +57,6 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     customStart: saved.customStart ?? DEFAULT_SETTINGS.customStart,
     customEnd: saved.customEnd ?? DEFAULT_SETTINGS.customEnd,
     tagFilters: Array.isArray(saved.tagFilters) ? saved.tagFilters : DEFAULT_SETTINGS.tagFilters,
-    tableVisible: saved.tableVisible ?? DEFAULT_SETTINGS.tableVisible,
-    problemsVisible: saved.problemsVisible ?? DEFAULT_SETTINGS.problemsVisible,
     customContestFrom: saved.customContestFrom ?? DEFAULT_SETTINGS.customContestFrom,
     customContestTo: saved.customContestTo ?? DEFAULT_SETTINGS.customContestTo,
     friendsVisible: saved.friendsVisible ?? DEFAULT_SETTINGS.friendsVisible,

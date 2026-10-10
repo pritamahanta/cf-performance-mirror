@@ -45,12 +45,14 @@
       #cfpm-friends-chevron-btn.collapsed svg,
       #cfpm-fsubs-chevron-btn.collapsed svg { transform: rotate(-90deg); }
 
-      #cfpm-compact button {
+      #cfpm-compact button, .cfpm-sandbox button {
         box-sizing: border-box; -webkit-appearance: none; appearance: none;
         transition: none !important;
       }
       #cfpm-compact button:hover, #cfpm-compact button:focus,
-      #cfpm-compact button:active, #cfpm-compact button:focus-visible {
+      #cfpm-compact button:active, #cfpm-compact button:focus-visible,
+      .cfpm-sandbox button:hover, .cfpm-sandbox button:focus,
+      .cfpm-sandbox button:active, .cfpm-sandbox button:focus-visible {
         outline: none !important; box-shadow: none !important;
         filter: none !important; -webkit-filter: none !important;
       }

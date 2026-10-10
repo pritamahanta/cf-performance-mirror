@@ -47,12 +47,12 @@ const sub = (id: number, index: string, verdict: string | undefined, createdAt: 
 
 /* ---------- settings ---------- */
 
-test('friends submissions: off by default, box open by default', () => {
-  assert.equal(DEFAULT_SETTINGS.friendSubmissionsVisible, false);
+test('friends submissions: on by default, box open by default', () => {
+  assert.equal(DEFAULT_SETTINGS.friendSubmissionsVisible, true);
   assert.equal(DEFAULT_SETTINGS.friendSubmissionsExpanded, true);
 
   const fresh = normalizeSettings({});
-  assert.equal(fresh.friendSubmissionsVisible, false);
+  assert.equal(fresh.friendSubmissionsVisible, true);
   assert.equal(fresh.friendSubmissionsExpanded, true);
 });
 
@@ -60,7 +60,7 @@ test('friends submissions: older saved settings keep every other value', () => {
   const s = normalizeSettings({ friendsVisible: true, friendsExpanded: false });
   assert.equal(s.friendsVisible, true);
   assert.equal(s.friendsExpanded, false);
-  assert.equal(s.friendSubmissionsVisible, false);
+  assert.equal(s.friendSubmissionsVisible, true);
   assert.equal(s.friendSubmissionsExpanded, true);
 });
 

@@ -84,13 +84,13 @@
       <li><strong>Contest and rating data</strong> — fetched from the public Codeforces API (<code>codeforces.com/api/contest.list</code> and <code>codeforces.com/api/user.rating</code>).</li>
     </ul>
     <p>All of this data is publicly available on Codeforces and is only retrieved for the purpose of rendering statistics within your browser.</p>
-    <p>The <strong>Online Friends panel</strong> is optional and off by default. It only works while you are logged in to Codeforces. When you turn it on, the Extension also:</p>
+    <p>The <strong>Online Friends panel</strong> is on by default and can be turned off with the Friends button in the profile page's controls. It only works while you are logged in to Codeforces. While it is on, the Extension also:</p>
     <ul>
       <li>Loads <code>https://codeforces.com/friends</code> using your browser's existing Codeforces login session, the same way the site would if you opened that page. The Extension never sees, stores, or transmits your password or session token — only the list of friend handles that page shows.</li>
       <li>Reads each friend's public profile page (the same "Last visit: online now" text anyone can see there) to tell who is online.</li>
       <li>Asks the Codeforces <code>user.info</code> API about your friends' handles, to get their rating, rank and when each was last active. These requests are made by the Extension's background service worker.</li>
     </ul>
-    <p>The <strong>Friends submissions box</strong> is a separate option, also off by default, and only works while you are logged in to Codeforces. It appears on problem pages of regular contests (not gym contests). When you turn it on and its box is open, the Extension:</p>
+    <p>The <strong>Friends submissions box</strong> is a separate option, also on by default (the Submissions button in the profile page's controls turns it off), and only works while you are logged in to Codeforces. It appears on problem pages of regular contests (not gym contests). While it is on and its box is open, the Extension:</p>
     <ul>
       <li>Loads <code>https://codeforces.com/friends</code> the same way as above, to get your friends' handles.</li>
       <li>Asks the Codeforces <code>contest.status</code> API for each friend's submissions in the contest of the problem page you opened. Only the friend's handle and the contest id are sent, to codeforces.com.</li>

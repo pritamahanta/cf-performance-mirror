@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -63,7 +64,7 @@ import {
 } from './friction/FrictionPanel';
 
 /* Max width (px) of the Timings box; the table scrolls sideways inside it. */
-const TIMINGS_MAX_WIDTH = 560;
+const TIMINGS_MAX_WIDTH = 720;
 
 interface Props {
   engine: PerformanceEngine;
@@ -162,6 +163,27 @@ export function PerformanceMirror({
   ] = useState(
     initialEnabled,
   );
+
+  /*
+   * Which of the two boxes is open. Local on purpose, not a saved
+   * setting: a box that reopened itself on every page load would be in
+   * the way.
+   */
+  const [
+    openView,
+    setOpenView,
+  ] = useState<
+    'timings' | 'problems' | null
+  >(null);
+
+  const closeView =
+    useCallback(
+      () =>
+        setOpenView(
+          null,
+        ),
+      [],
+    );
 
   const [
     popupSort,
@@ -338,6 +360,13 @@ export function PerformanceMirror({
     maxWidth: 920,
   };
 
+  const scope =
+    `${settings.category} · ` +
+    `${settings.mode[0].toUpperCase()}${settings.mode.slice(1)} · ` +
+    timelineDisplayLabel(
+      settings,
+    );
+
   const infoLine = (
     <div
       className="cfpm-info"
@@ -466,15 +495,29 @@ export function PerformanceMirror({
           onChange={
             updateSettings
           }
+          onOpen={
+            setOpenView
+          }
         />
 
         <div
           id="cfpm-timeline-extra"
         />
 
-        {settings.tableVisible && (
+        {openView === 'timings' && (
           <Sandbox
-            title="Timings"
+            label="Timings"
+            title={
+              <>
+                <strong>
+                  Timings
+                </strong>
+                {`, ${scope}`}
+              </>
+            }
+            onClose={
+              closeView
+            }
             theme={
               theme
             }
@@ -527,9 +570,20 @@ export function PerformanceMirror({
           </Sandbox>
         )}
 
-        {settings.problemsVisible && (
+        {openView === 'problems' && (
           <Sandbox
-            title="Problems"
+            label="Problems"
+            title={
+              <>
+                <strong>
+                  Problems
+                </strong>
+                {`, ${scope}`}
+              </>
+            }
+            onClose={
+              closeView
+            }
             theme={
               theme
             }

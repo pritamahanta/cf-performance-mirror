@@ -7,11 +7,11 @@ interface Props {
   settings: ExtensionSettings;
   theme: Theme;
   onChange: (patch: Partial<ExtensionSettings>) => void;
+  /* Open the Timings or Problems box. */
+  onOpen: (view: 'timings' | 'problems') => void;
 }
 
 type ToggleKey =
-  | 'tableVisible'
-  | 'problemsVisible'
   | 'friendsVisible'
   | 'friendSubmissionsVisible';
 
@@ -33,16 +33,16 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
-const TOGGLES: Array<{
-  key: ToggleKey;
+const VIEWS: Array<{
+  view: 'timings' | 'problems';
   label: string;
-  noun: string;
+  hint: string;
   icon: ReactNode;
 }> = [
   {
-    key: 'tableVisible',
+    view: 'timings',
     label: 'Timings',
-    noun: 'timings',
+    hint: 'Open: average and median solve time for each problem letter',
     icon: (
       <Icon>
         <rect x="1" y="2" width="14" height="12" rx="1.5" />
@@ -53,9 +53,9 @@ const TOGGLES: Array<{
     ),
   },
   {
-    key: 'problemsVisible',
+    view: 'problems',
     label: 'Problems',
-    noun: 'problems',
+    hint: 'Open: the problems you got errors on, with their submissions',
     icon: (
       <Icon>
         <path d="M3.5 1.5h6l3 3v10h-9z" />
@@ -65,10 +65,18 @@ const TOGGLES: Array<{
       </Icon>
     ),
   },
+];
+
+const TOGGLES: Array<{
+  key: ToggleKey;
+  label: string;
+  noun: string;
+  icon: ReactNode;
+}> = [
   {
     key: 'friendsVisible',
     label: 'Friends',
-    noun: 'online friends',
+    noun: 'the Online Friends box in the sidebar',
     icon: (
       <Icon>
         <circle cx="6" cy="5.2" r="2.2" />
@@ -81,7 +89,7 @@ const TOGGLES: Array<{
   {
     key: 'friendSubmissionsVisible',
     label: 'Submissions',
-    noun: 'friends submissions',
+    noun: 'the Friends submissions box (problem pages)',
     icon: (
       <Icon>
         <path d="M5.5 3.5h8" />
@@ -96,12 +104,12 @@ const TOGGLES: Array<{
 ];
 
 /*
- * The four independent on/off buttons of the profile card. Timings and
- * Problems open their own boxes under the buttons (each carrying the
- * Div / time-or-contest / total-or-rated filters); Friends and
- * Submissions switch the two sidebar boxes.
+ * The profile card's buttons. Timings and Problems open their own box
+ * over the page (each carrying the Div / time-or-contest / total-or-rated
+ * filters); Friends and Submissions switch the two sidebar boxes on or
+ * off, and say so in the label next to them.
  */
-export function ToggleBar({ settings, theme, onChange }: Props) {
+export function ToggleBar({ settings, theme, onChange, onOpen }: Props) {
   return (
     <div
       className="cfpm-toggle-bar"
@@ -113,14 +121,45 @@ export function ToggleBar({ settings, theme, onChange }: Props) {
         margin: '12px 0',
       }}
     >
+      {VIEWS.map(({ view, label, hint, icon }) => (
+        <button
+          key={view}
+          type="button"
+          className="cfpm-pill-btn"
+          title={hint}
+          style={{
+            gap: 6,
+            background: theme.btnBg,
+            color: theme.btnText,
+            border: `1px solid ${theme.btnBorder}`,
+          }}
+          onClick={() => onOpen(view)}
+        >
+          {icon}
+          <span>{label}</span>
+        </button>
+      ))}
+
+      <span
+        style={{
+          marginLeft: 8,
+          fontSize: 11,
+          color: theme.muted,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Sidebar boxes:
+      </span>
+
       {TOGGLES.map(({ key, label, noun, icon }) => {
         const on = settings[key];
 
         return (
           <button
             key={key}
+            type="button"
             className={`cfpm-pill-btn ${on ? 'active' : ''}`}
-            title={`${on ? 'Hide' : 'Show'} ${noun}`}
+            title={`${on ? 'On' : 'Off'}: ${noun}. Click to turn ${on ? 'off' : 'on'}.`}
             aria-pressed={on}
             style={{
               gap: 6,

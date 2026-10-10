@@ -15,14 +15,22 @@ Analyze overall performance, solve time, failure rates, rating changes, and erro
 ## How it works
 The performance panel runs entirely client-side on `codeforces.com/profile/<handle>`. It fetches from public Codeforces APIs (`user.status`, `contest.list`, `user.rating`). No login needed, no server, no tracking.
 
-The Online Friends panel is a separate, **opt-in** feature (off by default) that shows which of your Codeforces friends are online. Turning it on requires being logged in to Codeforces. See [Online Friends: what it does and its limits](#online-friends-what-it-does-and-its-limits) below and `PRIVACY_POLICY.md`.
+The Online Friends panel is a separate feature, **on by default**, that shows which of your Codeforces friends are online. It needs you to be logged in to Codeforces, and the Friends button in the profile page's controls turns it off. See [Online Friends: what it does and its limits](#online-friends-what-it-does-and-its-limits) below and `PRIVACY_POLICY.md`.
 
-The Friends submissions box is a second, separate **opt-in** feature (off by default) that shows, on problem pages only, which of your Codeforces friends have submitted that problem, and whether they solved it. It does not depend on Online Friends. See [Friends submissions](#friends-submissions-problem-pages-only).
+The Friends submissions box is a second, separate feature, **on by default**, that shows, on problem pages only, which of your Codeforces friends have submitted that problem, and whether they solved it. It does not depend on Online Friends, and the Submissions button in the profile page's controls turns it off. See [Friends submissions](#friends-submissions-problem-pages-only).
+
+## How to use it (profile page)
+
+- **Timings** opens a box with the average and median solve time, solved count, attempts and failure rate for each problem letter.
+- **Problems** opens a box listing the problems you got errors on, with filters, sorting and the submissions behind each count.
+- Both boxes have their own **category** (Div1 … Other), **time range** and **Total / Rated / Unrated** controls, and say what is being counted in their header.
+- Close a box with the ✕, by clicking outside it, or with Esc.
+- **Friends** and **Submissions** switch the Online Friends and Friends submissions sidebar boxes on or off. Both are on by default.
 
 ## Where it appears
 - The performance panel is injected into Codeforces profile pages (URLs matching `https://codeforces.com/profile/*`).
-- The Online Friends panel, once turned on, appears site-wide on `codeforces.com` pages that have a sidebar, not only profile pages.
-- The Friends submissions box, once turned on, appears in the sidebar of problem pages only (`/problemset/problem/<contest>/<problem>` and `/contest/<id>/problem/<problem>` of regular contests; gym contests are skipped), directly above Online Friends.
+- The Online Friends panel, while turned on, appears site-wide on `codeforces.com` pages that have a sidebar, not only profile pages.
+- The Friends submissions box, while turned on, appears in the sidebar of problem pages only (`/problemset/problem/<contest>/<problem>` and `/contest/<id>/problem/<problem>` of regular contests; gym contests are skipped), directly above Online Friends.
 - The Friends submissions box is switched on and off with the checklist-icon button next to the people icon in the performance panel on your profile page. While that is off, the box is not shown and makes no requests. While it is on, the chevron in the box's own header opens and closes it; a closed box shows only its header and also makes no requests.
 - The Online Friends panel is switched on and off with the people-icon button in the performance panel on your profile page. While that is off, the panel is not shown anywhere and makes no requests. While it is on, the chevron in the panel's own header opens and closes it; a closed panel shows only its header and also makes no requests.
 
@@ -71,7 +79,7 @@ Independent of Online Friends: it lists friends whether or not they are online.
 ## Privacy & security 🛡️
 - No server operated by the developer, no tracking, no ads — nothing is uploaded anywhere.
 - The performance panel uses only public Codeforces APIs and needs no login.
-- The Online Friends panel is opt-in and, once turned on, uses your existing Codeforces login session to read your own friends page; it never sees or stores your password or session token. It keeps the friend list, online status, ratings and last-activity times in `localStorage`, and both on your device. The Friends submissions box, if turned on, keeps short-lived caches of friends' contest submissions and ratings in `localStorage`, and of your friend list in `sessionStorage` (this tab only). See `PRIVACY_POLICY.md` for the full list.
+- The Online Friends panel is on by default (you can turn it off) and, while on, uses your existing Codeforces login session to read your own friends page; it never sees or stores your password or session token. It keeps the friend list, online status, ratings and last-activity times in `localStorage`, and both on your device. The Friends submissions box, while on, keeps short-lived caches of friends' contest submissions and ratings in `localStorage`, and of your friend list in `sessionStorage` (this tab only). See `PRIVACY_POLICY.md` for the full list.
 - Requires host permission for `https://codeforces.com/*` to fetch data directly. No other permissions.
 - Inspect the source before installing if you want to verify behavior — the codebase is small and self-contained.
 

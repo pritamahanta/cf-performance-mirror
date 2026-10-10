@@ -18,8 +18,6 @@ export interface SavedSettings {
   customStart?: string;
   customEnd?: string;
   tagFilters?: string[];
-  tableVisible?: boolean;
-  problemsVisible?: boolean;
   customContestFrom?: string;
   customContestTo?: string;
   friendsVisible?: boolean;
@@ -43,8 +41,6 @@ export interface ExtensionSettings {
   customStart: string;
   customEnd: string;
   tagFilters: string[];
-  tableVisible: boolean;
-  problemsVisible: boolean;
   customContestFrom: string;
   customContestTo: string;
   friendsVisible: boolean;
