@@ -1,6 +1,6 @@
 {
   "name": "cf-performance-mirror",
-  "version": "1.0.15.7",
+  "version": "1.0.16",
   "description": "CF Performance Mirror \u2014 React + TypeScript refactor",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
