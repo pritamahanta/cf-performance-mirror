@@ -773,14 +773,11 @@ const SUBMISSION_PAGE_TIMEOUT_MS =
  * reads the submission's own page the same way fetchOnlineFriends and
  * checkProfileOnlineStatus already read other Codeforces pages.
  *
- * Codeforces wraps that source in its own syntax-highlighting spans
- * (that's what gives the real "view source" dialog its colors), so
- * both forms are returned: `html` (the element's innerHTML, kept as
- * markup so the overlay can render it and inherit those colors from
- * Codeforces' own stylesheet, already loaded on the page this content
- * script runs in - no colors are invented here) and `text` (the
- * element's textContent, the exact plain source, for the Copy button
- * and as the signal of whether anything was actually found).
+ * What is returned is the element's textContent: the exact plain
+ * source. The page Codeforces serves holds the source as plain text and
+ * colors it with a script in the browser, so there is no color markup
+ * to take from it; the overlay colors the text itself (see highlight()).
+ * An empty or missing element means nothing was actually found.
  *
  * Not every submission is viewable this way - the author may have
  * restricted it, or the viewer may simply not be allowed to see it -
@@ -790,7 +787,6 @@ const SUBMISSION_PAGE_TIMEOUT_MS =
  * rejects.
  */
 export interface SubmissionSource {
-  html: string;
   text: string;
 }
 
@@ -924,7 +920,6 @@ export function loadSourceInFrame(
               text &&
               text.trim()
               ? {
-                  html: element.innerHTML,
                   text,
                 }
               : null,
@@ -1084,29 +1079,7 @@ export async function fetchSubmissionSourceText(
     );
   }
 
-  /*
-   * Not `instanceof HTMLElement`: that global does not exist outside
-   * a real DOM (notably in this project's node:test suite, which
-   * fakes DOMParser), so the markup is kept whenever the parsed
-   * element actually has an innerHTML string to offer, real DOM or
-   * fake, and the plain text is the fallback otherwise.
-   */
-  const sourceHtml =
-    typeof (
-      sourceEl as {
-        innerHTML?: unknown;
-      }
-    )?.innerHTML ===
-    'string'
-      ? (
-          sourceEl as unknown as {
-            innerHTML: string;
-          }
-        ).innerHTML
-      : sourceText;
-
   return {
-    html: sourceHtml,
     text: sourceText,
   };
 }

@@ -24,16 +24,15 @@ function installPageWithSource(source: string | null, html?: string) {
   };
 }
 
-test('fetchSubmissionSourceText: returns the text of #program-source-text as both html and text', async () => {
+test('fetchSubmissionSourceText: returns the text of #program-source-text and nothing else', async () => {
   installPageWithSource('#include <bits/stdc++.h>\nint main() {}\n');
   globalThis.fetch = (async () => new Response('<html></html>', { status: 200 })) as typeof fetch;
 
   const source = await fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1');
-  assert.equal(source.text, '#include <bits/stdc++.h>\nint main() {}\n');
-  assert.equal(source.html, '#include <bits/stdc++.h>\nint main() {}\n');
+  assert.deepEqual(source, { text: '#include <bits/stdc++.h>\nint main() {}\n' });
 });
 
-test('fetchSubmissionSourceText: keeps the element\'s own innerHTML (syntax-highlighting markup) separately from its plain text', async () => {
+test('fetchSubmissionSourceText: gives the element\'s plain text, not its markup', async () => {
   installPageWithSource(
     '#include <bits/stdc++.h>',
     '<span class="comment">#include &lt;bits/stdc++.h&gt;</span>',
@@ -41,8 +40,7 @@ test('fetchSubmissionSourceText: keeps the element\'s own innerHTML (syntax-high
   globalThis.fetch = (async () => new Response('<html></html>', { status: 200 })) as typeof fetch;
 
   const source = await fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1');
-  assert.equal(source.html, '<span class="comment">#include &lt;bits/stdc++.h&gt;</span>');
-  assert.equal(source.text, '#include <bits/stdc++.h>', 'the Copy button must still get the plain source, not markup');
+  assert.deepEqual(source, { text: '#include <bits/stdc++.h>' }, 'the Copy button must get the plain source, not markup');
 });
 
 test('fetchSubmissionSourceText: no such element on the page is a clear error, not empty source', async () => {
@@ -167,7 +165,7 @@ test('hidden frame: returns the source from the framed page and always removes t
   });
 
   const result = await loadSourceInFrame('https://codeforces.com/contest/1/submission/1');
-  assert.deepEqual(result, { html: 'int main(){}', text: 'int main(){}' });
+  assert.deepEqual(result, { text: 'int main(){}' });
   assert.equal(frames[0].src, 'https://codeforces.com/contest/1/submission/1');
   assert.equal(frames[0].removed, true);
 });
@@ -203,7 +201,7 @@ test('fetchSubmissionSourceText: a 403 is retried in a hidden frame and succeeds
   globalThis.fetch = (async () => new Response('', { status: 403 })) as typeof fetch;
 
   const source = await fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1');
-  assert.deepEqual(source, { html: 'framed <b>source</b>', text: 'framed source' });
+  assert.deepEqual(source, { text: 'framed source' });
 });
 
 test('fetchSubmissionSourceText: a 403 that the frame cannot fix still reports the refusal', async () => {

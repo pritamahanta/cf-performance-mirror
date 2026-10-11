@@ -72,7 +72,7 @@ const BOLD_TOKENS: ReadonlySet<TokenType> = new Set<TokenType>([
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; html: string; text: string }
+  | { status: 'ready'; text: string }
   | { status: 'error'; message: string };
 
 /*
@@ -128,7 +128,6 @@ export function SubmissionSourceOverlay({
       .then(source => {
         setState({
           status: 'ready',
-          html: source.html,
           text: source.text,
         });
       })
