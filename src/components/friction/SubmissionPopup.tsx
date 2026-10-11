@@ -5,6 +5,7 @@ import { buildSubmissionUrl, submissionSortKey } from '../../domain/friction';
 import type { SubmissionTiming } from '../../types/performance';
 import type { Theme } from '../../domain/theme';
 import { SubmissionSourceOverlay } from '../SubmissionSourceOverlay';
+import { cancelPrefetchIntent, prefetchOnIntent } from '../../services/submissionSourceCache';
 
 /*
  * This popup only ever opens on a Codeforces profile page (see
@@ -231,6 +232,10 @@ export function SubmissionPopup({
                 type="button"
                 className="cfpm-sub-link"
                 style={{ ...itemStyle, width: '100%', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+                onPointerEnter={() => prefetchOnIntent(url)}
+                onPointerLeave={cancelPrefetchIntent}
+                onFocus={() => prefetchOnIntent(url)}
+                onBlur={cancelPrefetchIntent}
                 onClick={() => setOpenedSubmission({ id, url })}
               >
                 {children}

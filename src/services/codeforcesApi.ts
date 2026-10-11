@@ -1121,6 +1121,7 @@ export async function fetchSubmissionSourceText(
   url: string,
   signal?: AbortSignal,
   timeoutMs = SUBMISSION_PAGE_TIMEOUT_MS,
+  allowFrameFallback = true,
 ): Promise<SubmissionSource> {
   const limit =
     new AbortController();
@@ -1197,6 +1198,7 @@ export async function fetchSubmissionSourceText(
 
       /* The fallback below only retries a refusal, not other failures. */
       refused =
+        allowFrameFallback &&
         response.status ===
         403;
 

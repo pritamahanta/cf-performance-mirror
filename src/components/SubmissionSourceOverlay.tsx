@@ -11,7 +11,11 @@ import type {
 
 import { createPortal } from 'react-dom';
 
-import { UserFacingError, fetchSubmissionSourceText } from '../services/codeforcesApi';
+import { UserFacingError } from '../services/codeforcesApi';
+import {
+  getSubmissionSource,
+  peekCachedSubmissionText,
+} from '../services/submissionSourceCache';
 import { highlight } from '../domain/highlight';
 import type { TokenType } from '../domain/highlight';
 import type { Theme } from '../domain/theme';
@@ -98,8 +102,20 @@ export function SubmissionSourceOverlay({
   onClose,
 }: Props) {
   const [state, setState] =
-    useState<LoadState>({
-      status: 'loading',
+    useState<LoadState>(() => {
+      const cached =
+        peekCachedSubmissionText(
+          url,
+        );
+
+      return cached !== null
+        ? {
+            status: 'ready',
+            text: cached,
+          }
+        : {
+            status: 'loading',
+          };
     });
 
   const [copied, setCopied] =
@@ -118,10 +134,29 @@ export function SubmissionSourceOverlay({
     );
 
   useEffect(() => {
+    const cached =
+      peekCachedSubmissionText(
+        url,
+      );
+
+    if (cached !== null) {
+      setState(previous =>
+        previous.status === 'ready' &&
+        previous.text === cached
+          ? previous
+          : {
+              status: 'ready',
+              text: cached,
+            },
+      );
+
+      return;
+    }
+
     const controller =
       new AbortController();
 
-    fetchSubmissionSourceText(
+    getSubmissionSource(
       url,
       controller.signal,
     )
