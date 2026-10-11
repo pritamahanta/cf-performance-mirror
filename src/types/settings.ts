@@ -20,6 +20,13 @@ export interface SavedSettings {
   tagFilters?: string[];
   customContestFrom?: string;
   customContestTo?: string;
+  problemsCategory?: Category;
+  problemsMode?: Mode;
+  problemsTimeline?: TimelineValue;
+  problemsCustomStart?: string;
+  problemsCustomEnd?: string;
+  problemsCustomContestFrom?: string;
+  problemsCustomContestTo?: string;
   friendsVisible?: boolean;
   friendsExpanded?: boolean;
   friendSubmissionsVisible?: boolean;
@@ -43,6 +50,14 @@ export interface ExtensionSettings {
   tagFilters: string[];
   customContestFrom: string;
   customContestTo: string;
+  /* The Problems box's own Contest type / Period / Show filters; the Timings box uses the unprefixed ones above. */
+  problemsCategory: Category;
+  problemsMode: Mode;
+  problemsTimeline: TimelineValue;
+  problemsCustomStart: string;
+  problemsCustomEnd: string;
+  problemsCustomContestFrom: string;
+  problemsCustomContestTo: string;
   friendsVisible: boolean;
   friendsExpanded: boolean;
   friendSubmissionsVisible: boolean;

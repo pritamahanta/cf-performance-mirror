@@ -6,6 +6,9 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   hideAC: false, hideTags: false, hideRatings: false, solvedOnly: false,
   minAttempts: 1, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
   tagFilters: [], customContestFrom: '', customContestTo: '',
+  problemsCategory: 'Div4', problemsMode: 'total', problemsTimeline: 'all',
+  problemsCustomStart: '', problemsCustomEnd: '',
+  problemsCustomContestFrom: '', problemsCustomContestTo: '',
   /*
    * On by default. This is the master switch (the Friends button in the
    * profile page's controls): while it is off the Online Friends box is
@@ -42,6 +45,14 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
 export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
   const timeline = saved.timeline && VALID_TIMELINE_VALUES.has(saved.timeline) ? saved.timeline : DEFAULT_SETTINGS.timeline;
   const sortMode = saved.sortMode === 'rating' || saved.sortMode === 'errors' ? saved.sortMode : DEFAULT_SETTINGS.sortMode;
+  /*
+   * The Problems box's own Contest type / Period / Show filters. Settings
+   * saved before they existed have none, so they start from that user's
+   * saved Timings values (what the Problems box showed until now) and are
+   * independent from then on.
+   */
+  const problemsTimelineSaved = saved.problemsTimeline ?? saved.timeline;
+  const problemsTimeline = problemsTimelineSaved && VALID_TIMELINE_VALUES.has(problemsTimelineSaved) ? problemsTimelineSaved : DEFAULT_SETTINGS.problemsTimeline;
   return {
     category: saved.category || DEFAULT_SETTINGS.category,
     mode: saved.mode || DEFAULT_SETTINGS.mode,
@@ -59,9 +70,65 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     tagFilters: Array.isArray(saved.tagFilters) ? saved.tagFilters : DEFAULT_SETTINGS.tagFilters,
     customContestFrom: saved.customContestFrom ?? DEFAULT_SETTINGS.customContestFrom,
     customContestTo: saved.customContestTo ?? DEFAULT_SETTINGS.customContestTo,
+    problemsCategory: saved.problemsCategory || saved.category || DEFAULT_SETTINGS.problemsCategory,
+    problemsMode: saved.problemsMode || saved.mode || DEFAULT_SETTINGS.problemsMode,
+    problemsTimeline,
+    problemsCustomStart: saved.problemsCustomStart ?? saved.customStart ?? DEFAULT_SETTINGS.problemsCustomStart,
+    problemsCustomEnd: saved.problemsCustomEnd ?? saved.customEnd ?? DEFAULT_SETTINGS.problemsCustomEnd,
+    problemsCustomContestFrom: saved.problemsCustomContestFrom ?? saved.customContestFrom ?? DEFAULT_SETTINGS.problemsCustomContestFrom,
+    problemsCustomContestTo: saved.problemsCustomContestTo ?? saved.customContestTo ?? DEFAULT_SETTINGS.problemsCustomContestTo,
     friendsVisible: saved.friendsVisible ?? DEFAULT_SETTINGS.friendsVisible,
     friendsExpanded: saved.friendsExpanded ?? DEFAULT_SETTINGS.friendsExpanded,
     friendSubmissionsVisible: saved.friendSubmissionsVisible ?? DEFAULT_SETTINGS.friendSubmissionsVisible,
     friendSubmissionsExpanded: saved.friendSubmissionsExpanded ?? DEFAULT_SETTINGS.friendSubmissionsExpanded,
   };
+}
+
+/*
+ * The Problems box has its own copy of the Contest type / Period / Show
+ * filters (the `problems`-prefixed settings), so changing them there
+ * leaves the Timings box alone and the other way round. These two let
+ * the shared filter bar and the problem list work on one box at a time
+ * without knowing which box it is: problemsView presents the Problems
+ * filters under the plain names, and toProblemsPatch turns a change made
+ * through those plain names back into the prefixed settings. Every other
+ * key (the problem list's own filters, the friends flags) passes through
+ * untouched.
+ */
+export function problemsView(settings: ExtensionSettings): ExtensionSettings {
+  return {
+    ...settings,
+    category: settings.problemsCategory,
+    mode: settings.problemsMode,
+    timeline: settings.problemsTimeline,
+    customStart: settings.problemsCustomStart,
+    customEnd: settings.problemsCustomEnd,
+    customContestFrom: settings.problemsCustomContestFrom,
+    customContestTo: settings.problemsCustomContestTo,
+  };
+}
+
+export function toProblemsPatch(patch: Partial<ExtensionSettings>): Partial<ExtensionSettings> {
+  const {
+    category,
+    mode,
+    timeline,
+    customStart,
+    customEnd,
+    customContestFrom,
+    customContestTo,
+    ...rest
+  } = patch;
+
+  const mapped: Partial<ExtensionSettings> = { ...rest };
+
+  if (category !== undefined) mapped.problemsCategory = category;
+  if (mode !== undefined) mapped.problemsMode = mode;
+  if (timeline !== undefined) mapped.problemsTimeline = timeline;
+  if (customStart !== undefined) mapped.problemsCustomStart = customStart;
+  if (customEnd !== undefined) mapped.problemsCustomEnd = customEnd;
+  if (customContestFrom !== undefined) mapped.problemsCustomContestFrom = customContestFrom;
+  if (customContestTo !== undefined) mapped.problemsCustomContestTo = customContestTo;
+
+  return mapped;
 }

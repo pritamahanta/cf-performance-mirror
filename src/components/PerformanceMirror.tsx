@@ -22,6 +22,8 @@ import type {
 } from '../types/settings';
 
 import type {
+  DeltaInfo,
+  ModeData,
   ResolvedTimeline,
 } from '../types/performance';
 
@@ -36,6 +38,8 @@ import {
 
 import {
   normalizeSettings,
+  problemsView,
+  toProblemsPatch,
 } from '../domain/settings';
 
 import {
@@ -195,6 +199,14 @@ export function PerformanceMirror({
     'time' | 'contest'
   >('time');
 
+  /* The Problems box keeps its own submission-list sort, like its filters. */
+  const [
+    problemsPopupSort,
+    setProblemsPopupSort,
+  ] = useState<
+    'time' | 'contest'
+  >('time');
+
   const resolvedTimeline:
     ResolvedTimeline =
       useMemo(
@@ -228,6 +240,56 @@ export function PerformanceMirror({
   const deltaInfo =
     deltaInfoByCategory[
       settings.category
+    ];
+
+  /*
+   * The Problems box has its own Contest type / Period / Show filters,
+   * separate from the Timings ones above, so it gets its own view of the
+   * settings and its own data.
+   */
+  const problemsSettings =
+    useMemo(
+      () =>
+        problemsView(
+          settings,
+        ),
+      [settings],
+    );
+
+  const problemsResolvedTimeline:
+    ResolvedTimeline =
+      useMemo(
+        () =>
+          resolveTimelineValue(
+            problemsSettings.timeline,
+            problemsSettings.customStart,
+            problemsSettings.customEnd,
+            problemsSettings.customContestFrom,
+            problemsSettings.customContestTo,
+          ),
+        [
+          problemsSettings.timeline,
+          problemsSettings.customStart,
+          problemsSettings.customEnd,
+          problemsSettings.customContestFrom,
+          problemsSettings.customContestTo,
+        ],
+      );
+
+  const {
+    modeData: problemsModeData,
+    deltaInfoByCategory:
+      problemsDeltaInfoByCategory,
+  } =
+    usePerformanceData(
+      engine,
+      problemsSettings.mode,
+      problemsResolvedTimeline,
+    );
+
+  const problemsDeltaInfo =
+    problemsDeltaInfoByCategory[
+      problemsSettings.category
     ];
 
   useEffect(() => {
@@ -307,42 +369,65 @@ export function PerformanceMirror({
     );
   };
 
+  const updateProblemsSettings = (
+    patch: Partial<ExtensionSettings>,
+  ) => {
+    updateSettings(
+      toProblemsPatch(
+        patch,
+      ),
+    );
+  };
+
+  const buildInfoText = (
+    view: ExtensionSettings,
+    data: ModeData,
+    delta: DeltaInfo,
+  ): string => {
+    const count =
+      data
+        .categoryContestCount[
+          view.category
+        ] || 0;
+
+    let text =
+      `${data.participatedCount} contests total · ` +
+      `${view.category}: ${count}`;
+
+    if (
+      delta?.count >
+      0
+    ) {
+      text +=
+        ` · Δ ${delta.delta >= 0 ? '+' : ''}` +
+        `${delta.delta} (${delta.count} rated)`;
+    }
+
+    const mode =
+      view.mode[0].toUpperCase() +
+      view.mode.slice(1);
+
+    return (
+      `${text} · ${mode} · ` +
+      `${timelineDisplayLabel(
+        view,
+      )}`
+    );
+  };
+
   const infoText =
-    useMemo(() => {
-      const count =
-        modeData
-          .categoryContestCount[
-            settings.category
-          ] || 0;
-
-      let text =
-        `${modeData.participatedCount} contests total · ` +
-        `${settings.category}: ${count}`;
-
-      if (
-        deltaInfo?.count >
-        0
-      ) {
-        text +=
-          ` · Δ ${deltaInfo.delta >= 0 ? '+' : ''}` +
-          `${deltaInfo.delta} (${deltaInfo.count} rated)`;
-      }
-
-      const mode =
-        settings.mode[0].toUpperCase() +
-        settings.mode.slice(1);
-
-      return (
-        `${text} · ${mode} · ` +
-        `${timelineDisplayLabel(
-          settings,
-        )}`
-      );
-    }, [
-      modeData,
+    buildInfoText(
       settings,
+      modeData,
       deltaInfo,
-    ]);
+    );
+
+  const problemsInfoText =
+    buildInfoText(
+      problemsSettings,
+      problemsModeData,
+      problemsDeltaInfo,
+    );
 
   const cardStyle:
     CSSProperties = {
@@ -363,14 +448,28 @@ export function PerformanceMirror({
     maxWidth: 920,
   };
 
-  const scope =
-    `${settings.category} · ` +
-    `${settings.mode[0].toUpperCase()}${settings.mode.slice(1)} · ` +
+  const buildScope = (
+    view: ExtensionSettings,
+  ): string =>
+    `${view.category} · ` +
+    `${view.mode[0].toUpperCase()}${view.mode.slice(1)} · ` +
     timelineDisplayLabel(
+      view,
+    );
+
+  const scope =
+    buildScope(
       settings,
     );
 
+  const problemsScope =
+    buildScope(
+      problemsSettings,
+    );
+
   const infoLine = (
+    text: string,
+  ) => (
     <div
       className="cfpm-info"
       style={{
@@ -378,7 +477,7 @@ export function PerformanceMirror({
           theme.muted,
       }}
     >
-      {infoText}
+      {text}
     </div>
   );
 
@@ -540,7 +639,9 @@ export function PerformanceMirror({
               }
             />
 
-            {infoLine}
+            {infoLine(
+              infoText,
+            )}
 
             <div
               className="cfpm-table-scroll"
@@ -581,7 +682,7 @@ export function PerformanceMirror({
                 <strong>
                   Problems
                 </strong>
-                {`, ${scope}`}
+                {`, ${problemsScope}`}
               </>
             }
             onClose={
@@ -596,39 +697,41 @@ export function PerformanceMirror({
           >
             <Controls
               settings={
-                settings
+                problemsSettings
               }
               theme={
                 theme
               }
               onChange={
-                updateSettings
+                updateProblemsSettings
               }
             />
 
-            {infoLine}
+            {infoLine(
+              problemsInfoText,
+            )}
 
             <FrictionPanel
               modeData={
-                modeData
+                problemsModeData
               }
               category={
-                settings.category
+                problemsSettings.category
               }
               settings={
-                settings
+                problemsSettings
               }
               theme={
                 theme
               }
               onSettingsChange={
-                updateSettings
+                updateProblemsSettings
               }
               popupSort={
-                popupSort
+                problemsPopupSort
               }
               onPopupSortChange={
-                setPopupSort
+                setProblemsPopupSort
               }
             />
           </Sandbox>
