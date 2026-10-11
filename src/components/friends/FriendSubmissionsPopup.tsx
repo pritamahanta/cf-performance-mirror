@@ -27,10 +27,6 @@ import type {
 
 import { useTheme } from '../../hooks/useTheme';
 import { SubmissionSourceOverlay } from '../SubmissionSourceOverlay';
-import {
-  cancelPrefetchIntent,
-  prefetchOnIntent,
-} from '../../services/submissionSourceCache';
 
 /*
  * The popup is as wide as its content needs (a row is two short
@@ -767,22 +763,6 @@ export function FriendSubmissionsPopup({
                   textAlign: 'left',
                   font: 'inherit',
                 }}
-                onPointerEnter={() =>
-                  prefetchOnIntent(
-                    url,
-                  )
-                }
-                onPointerLeave={
-                  cancelPrefetchIntent
-                }
-                onFocus={() =>
-                  prefetchOnIntent(
-                    url,
-                  )
-                }
-                onBlur={
-                  cancelPrefetchIntent
-                }
                 onClick={() =>
                   setOpenedSubmission(
                     submission,
