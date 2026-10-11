@@ -14,6 +14,7 @@ import { normalizeSettings } from '../domain/settings';
 import { PerformanceEngine } from '../domain/performanceEngine';
 
 import {
+  UserFacingError,
   fetchContests,
   fetchUserDataset,
 } from '../services/codeforcesApi';
@@ -483,24 +484,17 @@ function Root() {
           return;
         }
 
-        const message =
-          error instanceof
-            Error &&
-          error.message
-            ? error.message
-            : 'Could not connect to Codeforces. Please check your connection and try again.';
-
+        /*
+         * Only an error written for the user is shown as it is; anything
+         * else is, as far as the user is concerned, a connection problem.
+         */
         setLoadState({
           status: 'error',
           message:
-            message ===
-            'unknown'
-              ? 'Codeforces returned an error: unknown'
-              : message.startsWith(
-                  'Codeforces returned',
-                )
-                ? message
-                : 'Could not connect to Codeforces. Please check your connection and try again.',
+            error instanceof
+            UserFacingError
+              ? error.message
+              : 'Could not connect to Codeforces. Please check your connection and try again.',
         });
       }
     })();

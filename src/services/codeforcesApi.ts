@@ -31,6 +31,118 @@ const API_BASE =
   'https://codeforces.com/api';
 
 /*
+ * An error whose message is written for the person using the extension -
+ * no API names, status codes or Codeforces' own wording - so it can be
+ * shown as it is. Anything else that goes wrong is shown as a generic
+ * connection problem.
+ */
+export class UserFacingError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    this.name =
+      'UserFacingError';
+  }
+}
+
+const MESSAGE_BUSY =
+  'Codeforces is busy right now. Please wait a few seconds and try again.';
+
+const MESSAGE_SLOW =
+  'Codeforces is taking too long to respond. Please try again.';
+
+const MESSAGE_UNREADABLE =
+  'Codeforces sent a reply the extension could not read. Please try again later.';
+
+const MESSAGE_NOT_FOUND =
+  'This Codeforces user could not be found.';
+
+const MESSAGE_FAILED =
+  'Codeforces could not provide this data right now. Please try again in a moment.';
+
+/* Turns the API's own comment into wording for the user. */
+function friendlyApiMessage(
+  comment: string | undefined,
+): string {
+  const text =
+    comment ?? '';
+
+  if (
+    /limit exceeded/i.test(
+      text,
+    )
+  ) {
+    return MESSAGE_BUSY;
+  }
+
+  if (
+    /not found/i.test(
+      text,
+    )
+  ) {
+    return MESSAGE_NOT_FOUND;
+  }
+
+  return MESSAGE_FAILED;
+}
+
+/* Longest a single API call may take, request and reply together. */
+const API_TIMEOUT_MS =
+  30_000;
+
+async function fetchApiJson<T>(
+  path: string,
+): Promise<
+  CodeforcesApiResponse<T>
+> {
+  const limit =
+    new AbortController();
+
+  const timer =
+    setTimeout(
+      () =>
+        limit.abort(),
+      API_TIMEOUT_MS,
+    );
+
+  try {
+    const response =
+      await fetch(
+        `${API_BASE}${path}`,
+        {
+          signal:
+            limit.signal,
+        },
+      );
+
+    return (await response.json()) as CodeforcesApiResponse<T>;
+  } catch (error) {
+    if (
+      limit.signal.aborted
+    ) {
+      throw new UserFacingError(
+        MESSAGE_SLOW,
+      );
+    }
+
+    if (
+      error instanceof
+      SyntaxError
+    ) {
+      throw new UserFacingError(
+        MESSAGE_UNREADABLE,
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(
+      timer,
+    );
+  }
+}
+
+/*
  * Codeforces allows about one API call per two seconds, and the profile
  * page starts several together (contest list, submissions, rating), so a
  * call can be turned away with "Call limit exceeded". Such a call is
@@ -68,13 +180,10 @@ async function get<T>(
     ;
     attempt += 1
   ) {
-    const response =
-      await fetch(
-        `${API_BASE}${path}`,
-      );
-
     const data =
-      (await response.json()) as CodeforcesApiResponse<T>;
+      await fetchApiJson<T>(
+        path,
+      );
 
     if (
       data.status !== 'OK' &&
@@ -106,9 +215,15 @@ export async function fetchContests(): Promise<
       '/contest.list',
     );
 
-  return data.status === 'OK'
-    ? (data.result ?? [])
-    : [];
+  if (data.status !== 'OK') {
+    throw new UserFacingError(
+      friendlyApiMessage(
+        data.comment,
+      ),
+    );
+  }
+
+  return data.result ?? [];
 }
 
 /*
@@ -144,9 +259,15 @@ export async function fetchUserRating(
       `/user.rating?handle=${encodeURIComponent(handle)}`,
     );
 
-  return data.status === 'OK'
-    ? (data.result ?? [])
-    : [];
+  if (data.status !== 'OK') {
+    throw new UserFacingError(
+      friendlyApiMessage(
+        data.comment,
+      ),
+    );
+  }
+
+  return data.result ?? [];
 }
 
 export async function fetchUserSubmissions(
@@ -160,8 +281,10 @@ export async function fetchUserSubmissions(
     );
 
   if (data.status !== 'OK') {
-    throw new Error(
-      data.comment || 'unknown',
+    throw new UserFacingError(
+      friendlyApiMessage(
+        data.comment,
+      ),
     );
   }
 
