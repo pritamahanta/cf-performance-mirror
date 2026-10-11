@@ -64,8 +64,8 @@ export function updatingLabel(left: number): string {
 
 export function noSubmissionsMessage(checked: number): string {
   return checked === 1
-    ? 'The friend checked has no submissions on this problem.'
-    : `None of the ${checked} friends checked has submitted this problem.`;
+    ? 'The friend has no submissions for this problem.'
+    : `None of your ${checked} checked friends has submitted this problem.`;
 }
 
 export function failedNote(failed: number): string {
