@@ -107,13 +107,18 @@ can see them the way it sees any page you load.
 ## Opening a submission's source code
 
 In the Friends submissions list and in the profile page's Problems box, you can
-open a submission to read its source code in the page. Only when you do, the
+open a submission to read its source code in the page. When you open one, the
 extension loads that submission's page on codeforces.com
 (`https://codeforces.com/contest/<contest>/submission/<id>`, or `/gym/` for gym
 contests) using your browser's existing Codeforces login session, and reads the
-source from it. If Codeforces answers with HTTP 403, it tries once more by
-loading the same page in a hidden frame on codeforces.com. The source is kept in
-memory while the box is open and is not stored.
+source from it. To have the source ready sooner, it starts that same request
+when you rest the pointer on a submission in the list for a moment (about a
+quarter of a second) or move keyboard focus to it, one at a time. If you then do
+not open that submission, its page has still been loaded. If Codeforces answers
+with HTTP 403 when you open a submission, it tries once more by loading the same
+page in a hidden frame on codeforces.com; that retry is not made for the early
+request. The source is kept in memory only (up to 25 submissions, until the
+Codeforces page is closed or reloaded) and is not stored on disk.
 
 ## What is not collected
 
