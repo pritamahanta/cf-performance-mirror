@@ -30,19 +30,72 @@ import { getLoggedInHandle } from './onlineStore';
 const API_BASE =
   'https://codeforces.com/api';
 
+/*
+ * Codeforces allows about one API call per two seconds, and the profile
+ * page starts several together (contest list, submissions, rating), so a
+ * call can be turned away with "Call limit exceeded". Such a call is
+ * tried again after a pause, up to CALL_LIMIT_RETRIES times. Retries of
+ * calls turned away together are spaced one pause apart (see
+ * reserveRetryDelay) so they do not hit the limit together again.
+ */
+const CALL_LIMIT_PAUSE_MS = 2_100;
+const CALL_LIMIT_RETRIES = 2;
+
+let nextRetryAt = 0;
+
+function reserveRetryDelay(): number {
+  const now = Date.now();
+
+  const at =
+    Math.max(
+      now + CALL_LIMIT_PAUSE_MS,
+      nextRetryAt,
+    );
+
+  nextRetryAt =
+    at + CALL_LIMIT_PAUSE_MS;
+
+  return at - now;
+}
+
 async function get<T>(
   path: string,
 ): Promise<
   CodeforcesApiResponse<T>
 > {
-  const response =
-    await fetch(
-      `${API_BASE}${path}`,
-    );
+  for (
+    let attempt = 0;
+    ;
+    attempt += 1
+  ) {
+    const response =
+      await fetch(
+        `${API_BASE}${path}`,
+      );
 
-  return response.json() as Promise<
-    CodeforcesApiResponse<T>
-  >;
+    const data =
+      (await response.json()) as CodeforcesApiResponse<T>;
+
+    if (
+      data.status !== 'OK' &&
+      attempt < CALL_LIMIT_RETRIES &&
+      /limit exceeded/i.test(
+        data.comment ?? '',
+      )
+    ) {
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            reserveRetryDelay(),
+          ),
+      );
+
+      continue;
+    }
+
+    return data;
+  }
 }
 
 export async function fetchContests(): Promise<
