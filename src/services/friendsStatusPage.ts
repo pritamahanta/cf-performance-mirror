@@ -28,7 +28,7 @@ import { getLoggedInHandle } from './onlineStore';
  * the margin below that is deliberate, and the pagination markup is
  * checked as well.
  */
-export const FRIENDS_STATUS_ROW_LIMIT = 25;
+export const FRIENDS_STATUS_ROW_LIMIT = 40;
 
 /* How long one answer is reused, per account and problem. */
 export const FRIENDS_STATUS_TTL_MS = 2 * 60 * 1000;
