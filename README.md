@@ -13,7 +13,7 @@ Analyse your Codeforces profile — solve times, WA% by topic and problem, divis
 Analyze overall performance, solve time, failure rates, rating changes, and errors by division and time range. Track your Codeforces performance with clear insights into solve times, failure rates, rating changes, and problem-level errors, broken down by division and time range. Filter by contest type and focus on selected topics or rating ranges to quickly spot weak areas and improve efficiently, all directly on your profile page.
 
 ## How it works
-The performance panel runs entirely client-side on `codeforces.com/profile/<handle>`. It fetches from public Codeforces APIs (`user.status`, `contest.list`, `user.rating`). No login needed, no server, no tracking.
+The performance panel runs entirely client-side on `codeforces.com/profile/<handle>`. It fetches from public Codeforces APIs (`user.status`, `contest.list`, `user.rating`, and, for the Problems box's *Solved by* column, `problemset.problems`). No login needed, no server, no tracking. The solved-by counts are kept in `localStorage` and fetched again when the stored copy is older than 24 hours.
 
 The Online Friends panel is a separate feature, **on by default**, that shows which of your Codeforces friends are online. It needs you to be logged in to Codeforces, and the Friends button in the profile page's controls turns it off. See [Online Friends: what it does and its limits](#online-friends-what-it-does-and-its-limits) below and `PRIVACY_POLICY.md`.
 
@@ -31,7 +31,7 @@ The Friends submissions box is a second, separate feature, **on by default**, th
 - The performance panel is injected into Codeforces profile pages (URLs matching `https://codeforces.com/profile/*`).
 - The Online Friends panel, while turned on, appears site-wide on `codeforces.com` pages that have a sidebar, not only profile pages.
 - The Friends submissions box, while turned on, appears in the sidebar of problem pages only (`/problemset/problem/<contest>/<problem>` and `/contest/<id>/problem/<problem>` of regular contests; gym contests are skipped), directly above Online Friends.
-- The Friends submissions box is switched on and off with the checklist-icon button next to the people icon in the performance panel on your profile page. While that is off, the box is not shown and makes no requests. While it is on, the chevron in the box's own header opens and closes it; a closed box shows only its header and also makes no requests.
+- The Friends submissions box is switched on and off with the checklist-icon button next to the people icon in the performance panel on your profile page. While that is off, the box is not shown and makes no requests. While it is on, its requests start when the problem page loads, whether the box is open or closed, so a box opened later is already filled; the chevron in the box's own header only opens and closes the list.
 - The Online Friends panel is switched on and off with the people-icon button in the performance panel on your profile page. While that is off, the panel is not shown anywhere and makes no requests. While it is on, the chevron in the panel's own header opens and closes it; a closed panel shows only its header and also makes no requests.
 
 ## Online Friends: what it does and its limits
@@ -39,7 +39,7 @@ The Friends submissions box is a second, separate feature, **on by default**, th
 **What it requests** (all to `codeforces.com`, nothing else):
 - `https://codeforces.com/friends`: your friend list, read with your browser's existing login session.
 - Each friend's public profile page; the download is cut off shortly after the "Last visit" line. A friend is shown as online when it says "online now" (English) or "сейчас на сайте" (Russian).
-- The `user.info` API for your friends' handles (100 per request): rating, rank and last-activity time. The last-activity time only decides which friends are checked first; being online is decided by the profile page.
+- The `user.info` API for your friends' handles (100 per request): rating, rank and last-activity time. The last-activity time only decides which friends are checked first; being online is decided by the profile page. The ratings and ranks it gets are also saved in the 6-hour ratings cache that Friends submissions uses (see *Caching* below).
 
 **When it runs and how fast**
 - Only while the panel is turned on and open. Hiding the Codeforces tab cancels the running profile checks and stops new lookups until the tab is visible again.
@@ -58,7 +58,7 @@ The Friends submissions box is a second, separate feature, **on by default**, th
 
 Independent of Online Friends: it lists friends whether or not they are online.
 
-**What it requests** (all to `codeforces.com`, nothing else), only while the feature is turned on and the box is open:
+**What it requests** (all to `codeforces.com`, nothing else), only while the feature is turned on (the box does not have to be open):
 - `https://codeforces.com/friends`: your whole friend list, read with your browser's existing login session.
 - The `user.info` API, one request per up to 100 friends, to colour handles by rating. If it fails, the handles are shown uncoloured.
 - Codeforces' own friends-only status page of the problem you are viewing (`/problemset/status/<contest>/problem/<letter>?friends=on`), once, using your login. It shows which friends have submitted the problem, so only those friends are looked up below; if the page is unavailable or may be incomplete, every friend is looked up instead.
@@ -68,14 +68,18 @@ Independent of Online Friends: it lists friends whether or not they are online.
 **What it shows**
 - Only friends with at least one submission on this problem, as rows like Online Friends: a coloured dot (green = solved, red = not solved), the friend's handle, and the number of their submissions on this problem. Solved friends come first, earliest solve first. The list has a fixed maximum height and scrolls.
 - A friend counts as solved when any of their submissions to that problem has the verdict "OK". The check does not tell contest submissions from later practice ones, and does not notice an accepted solution that was hacked afterwards.
-- The count opens a list of that friend's submissions on this problem (verdict, contest time or date); each one opens its source code in the page.
+- The count opens a list of that friend's submissions on this problem (verdict, contest time or date); each one opens its source code in the page (see *Opening a submission's source code* below).
 - Friends whose submissions could not be loaded are counted in a note ("N friends couldn't be checked.") and are not retried until the page is reloaded.
 
-**Caching (so reopening a problem page sends nothing)**
-- Each friend's submissions in a contest are kept in `localStorage` for 30 minutes, shared by all tabs, including an empty result. There is no polling: after 30 minutes, reload the page to see newer submissions.
-- Friends' ratings are kept in `localStorage` for 6 hours.
+**Caching (so reopening a problem page is fast)**
+- Each friend's submissions in a contest are kept in `localStorage` for up to 24 hours, shared by all tabs, including an empty result. A copy younger than 30 minutes is used without any request. An older copy is shown at once while a new request refreshes it; the footer reads "Updating… N left" until every refresh has returned. If a refresh fails, the old copy stays on screen and that friend is counted in the "couldn't be checked" note. Copies older than 24 hours are deleted. There is no polling: reload the page to refresh again.
+- Friends' ratings and ranks are kept in `localStorage` for 6 hours, keyed by handle (this is public Codeforces data, not tied to your account). The Online Friends panel saves the ratings it fetches into the same cache, so whichever box fetches them first saves the other the request.
 - Your friends list is kept in `sessionStorage` (this tab only) for 5 minutes, per logged-in account; it is not stored when the page does not show who is logged in.
 - Failed requests are never cached.
+
+## Opening a submission's source code
+
+In the Friends submissions list and in the profile Problems box, a submission can be opened to show its source code in the page. Only when you click one, the extension loads that submission's Codeforces page (`https://codeforces.com/contest/<id>/submission/<id>`, or `/gym/<id>/submission/<id>`) using your login session and reads the source from it. If Codeforces refuses that request with HTTP 403, it tries once more by loading the same page in a hidden frame on `codeforces.com`. If the source cannot be read (for example, Codeforces does not let you view it), the box says so and links to the submission. The source is kept in memory while the box is open and is not stored.
 
 ## Privacy & security 🛡️
 - No server operated by the developer, no tracking, no ads — nothing is uploaded anywhere.
@@ -105,8 +109,7 @@ The extension is written in React + TypeScript.
 npm install
 npm run typecheck
 npm run build
-npm install --no-save tsx   # tsx is not listed in package.json
-npx tsx --test tests/*.test.ts
+npm test
 ```
 
 The production bundle is emitted to `dist/content.js`.

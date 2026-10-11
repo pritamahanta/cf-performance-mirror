@@ -4,6 +4,7 @@
   "description": "CF Performance Mirror \u2014 React + TypeScript refactor",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test \"tests/*.test.ts\"",
     "build": "vite build && node scripts/package-extension.mjs"
   },
   "repository": {
@@ -12,7 +13,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/pritamahanta/cf-performance-mirror/issues"
   },
@@ -29,6 +30,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "@types/react": "^19.1.11",
     "@types/react-dom": "^19.1.8",
-    "jsdom": "^27.0.0"
+    "jsdom": "^27.0.0",
+    "tsx": "^4.23.15"
   }
 }

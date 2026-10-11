@@ -1,6 +1,6 @@
 Privacy Policy for CF Performance Mirror
 
-Last updated: October 10, 2026
+Last updated: October 11, 2026
 
 CF Performance Mirror does not transmit any data to the developer or to any
 third-party server. Its only network requests go to codeforces.com, the site
@@ -11,7 +11,10 @@ and codeforces.com.
 
 On Codeforces profile pages, the extension reads publicly available data —
 the Codeforces public API (`user.status`, `user.rating`, `contest.list`) —
-to compute and display contest performance statistics. This
+to compute and display contest performance statistics. For the Solved by column
+of the Problems box it also reads the public `problemset.problems` method, and
+keeps only the number of users who solved each problem in `localStorage`,
+fetching it again when the stored copy is older than 24 hours. This
 requires no login and no authentication of any kind. Your filter and display
 preferences, including whether the Online Friends panel and the Friends submissions
 box are turned on and open, are saved in your browser's `localStorage`.
@@ -33,7 +36,9 @@ Codeforces in your browser. While it is on:
   there).
 - It asks the Codeforces `user.info` API about your friends' handles, to get
   their rating, rank and when each was last active. Those requests are made
-  by the extension's background service worker.
+  by the extension's background service worker. The handle, rating and rank it
+  gets back are also saved in the ratings cache described under *Friends
+  submissions box* below.
 
 What is stored on your device:
 
@@ -57,7 +62,8 @@ On problem pages of regular contests (not gym contests) this box shows which
 of your friends have submitted the problem you are viewing. It is separate
 from the Online Friends panel, is on by default (the Submissions button in
 the profile page's controls turns it off), and only works while you are
-logged in to Codeforces. While it is on and its box is open:
+logged in to Codeforces. While it is on, whether its box is open or closed (the
+requests start when the problem page loads):
 
 - It loads `https://codeforces.com/friends` using your browser's existing
   Codeforces login session, as described above, to get your friends'
@@ -80,8 +86,12 @@ What is stored on your device:
 - In `localStorage`: a friend's submissions in the contest of the problem
   page you opened — submission id, problem letter, submission time,
   participant type, time since the contest started, verdict, test set and
-  passed-test count — reused for up to 30 minutes; a friend's rating and rank,
-  reused for up to 6 hours; and whether the box is turned on and open.
+  passed-test count — kept for up to 24 hours and used without a new request for
+  30 minutes (an older copy is shown while it is refreshed, and deleted once it
+  is 24 hours old); a friend's handle, rating and rank, reused for up to 6
+  hours (public Codeforces data stored by handle, not tied to your account,
+  which the Online Friends panel also writes to); and whether the box is
+  turned on and open.
 - In `sessionStorage` (this browser tab only, gone when the tab is closed):
   your friends' handles, keyed to your logged-in Codeforces handle, reused for
   up to 5 minutes. Nothing is stored if the page does not show who is logged
@@ -93,6 +103,17 @@ than codeforces.com.
 
 These are ordinary requests from your browser to codeforces.com, so Codeforces
 can see them the way it sees any page you load.
+
+## Opening a submission's source code
+
+In the Friends submissions list and in the profile page's Problems box, you can
+open a submission to read its source code in the page. Only when you do, the
+extension loads that submission's page on codeforces.com
+(`https://codeforces.com/contest/<contest>/submission/<id>`, or `/gym/` for gym
+contests) using your browser's existing Codeforces login session, and reads the
+source from it. If Codeforces answers with HTTP 403, it tries once more by
+loading the same page in a hidden frame on codeforces.com. The source is kept in
+memory while the box is open and is not stored.
 
 ## What is not collected
 
