@@ -11,7 +11,7 @@ import type {
 
 import { createPortal } from 'react-dom';
 
-import { fetchSubmissionSourceText } from '../services/codeforcesApi';
+import { UserFacingError, fetchSubmissionSourceText } from '../services/codeforcesApi';
 import { highlight } from '../domain/highlight';
 import type { TokenType } from '../domain/highlight';
 import type { Theme } from '../domain/theme';
@@ -139,11 +139,15 @@ export function SubmissionSourceOverlay({
           return;
         }
 
+        /*
+         * Only a message written for the user is shown as it is; a raw
+         * browser or network error never is.
+         */
         setState({
           status: 'error',
           message:
             error instanceof
-            Error
+            UserFacingError
               ? error.message
               : "Couldn't load this submission's source code inline.",
         });

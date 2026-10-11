@@ -16,7 +16,7 @@ import type {
   ProblemRef,
 } from '../domain/friendSubmissions';
 
-import { fetchUsersInfoPaced } from '../services/codeforcesApi';
+import { UserFacingError, fetchUsersInfoPaced } from '../services/codeforcesApi';
 import { loadFriendHandles } from '../services/friendsList';
 
 import {
@@ -111,12 +111,13 @@ export function useFriendSubmissionsFeed(
           return;
         }
 
+        /* Only a message written for the user is shown; raw errors never are. */
         setList({
           status: 'error',
           message:
-            error instanceof Error && error.message
+            error instanceof UserFacingError && error.message
               ? error.message
-              : 'Could not load your Codeforces friends.',
+              : 'Could not load your Codeforces friends. Please check your connection and try again.',
         });
       });
 

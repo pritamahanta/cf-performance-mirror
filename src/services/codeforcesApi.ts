@@ -486,7 +486,7 @@ export async function fetchOnlineFriends(
       );
 
     if (!response.ok) {
-      throw new Error(
+      throw new UserFacingError(
         'Could not load your Codeforces friends page.',
       );
     }
@@ -581,8 +581,8 @@ export async function fetchOnlineFriends(
       return [];
     }
 
-    throw new Error(
-      "Couldn't find your Codeforces friends table. Make sure you're logged in.",
+    throw new UserFacingError(
+      "Couldn't read your Codeforces friends list. Make sure you're logged in.",
     );
   }
 
@@ -618,7 +618,7 @@ export async function fetchOnlineFriends(
       return [];
     }
 
-    throw new Error(
+    throw new UserFacingError(
       "Couldn't find any friends on your Codeforces friends page.",
     );
   }
@@ -967,7 +967,8 @@ export interface SubmissionSource {
 }
 
 /*
- * The wording for a refused submission-page request. Exported for tests.
+ * The wording for a refused submission-page request, written for the
+ * user (no status codes). Exported for tests.
  * `head` is the start of the response body ('' if none could be read).
  */
 export function describeSubmissionPageFailure(
@@ -980,14 +981,14 @@ export function describeSubmissionPageFailure(
     );
 
   if (challenge) {
-    return `Codeforces' bot protection blocked the request (status ${status}). Open any Codeforces page in this browser, pass the check if one is shown, then try again.`;
+    return "Codeforces' bot protection blocked the request. Open any Codeforces page in this browser, pass the check if one is shown, then try again.";
   }
 
   if (status === 403) {
-    return 'Codeforces answered "forbidden" (status 403) for this submission. It may not allow your account to view this user\'s source code.';
+    return "You may not have permission to view this submission's source code on Codeforces.";
   }
 
-  return `Could not load the submission page (status ${status}).`;
+  return "Could not load this submission's source code. Please try again later.";
 }
 
 /* Longest the hidden page may take to load. */
@@ -1169,7 +1170,7 @@ export async function fetchSubmissionSourceText(
        * Codeforces itself (it limits who may view a submission's
        * source) or from the bot protection in front of it, and
        * the two need different advice; the start of the body tells
-       * them apart. The status always stays in the message.
+       * them apart. No status code is shown to the user.
        */
       let head =
         '';
@@ -1187,7 +1188,7 @@ export async function fetchSubmissionSourceText(
       }
 
       failure =
-        new Error(
+        new UserFacingError(
           describeSubmissionPageFailure(
             response.status,
             head,
@@ -1250,7 +1251,7 @@ export async function fetchSubmissionSourceText(
     !sourceText ||
     !sourceText.trim()
   ) {
-    throw new Error(
+    throw new UserFacingError(
       "Couldn't load this submission's source code inline.",
     );
   }

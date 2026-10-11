@@ -75,7 +75,7 @@ test('friends page: a page that cannot be inspected for a login stays an error',
     }
   };
   globalThis.fetch = (async () => new Response('<html></html>', { status: 200 })) as typeof fetch;
-  await assert.rejects(fetchOnlineFriends(undefined, 10_000), /friends table/);
+  await assert.rejects(fetchOnlineFriends(undefined, 10_000), /friends list/);
 });
 
 function fakeVisibility(): Visibility {

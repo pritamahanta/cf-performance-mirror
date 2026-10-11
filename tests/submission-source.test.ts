@@ -1,7 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fetchSubmissionSourceText } from '../src/services/codeforcesApi.ts';
+import { UserFacingError, fetchSubmissionSourceText } from '../src/services/codeforcesApi.ts';
 
 const realFetch = globalThis.fetch;
 const realDomParser = (globalThis as { DOMParser?: unknown }).DOMParser;
@@ -66,7 +66,12 @@ test('fetchSubmissionSourceText: a non-ok response is rejected and never reaches
 
   await assert.rejects(
     fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1'),
-    /403/,
+    (error: unknown) => {
+      assert.ok(error instanceof UserFacingError);
+      assert.match(error.message, /permission/);
+      assert.doesNotMatch(error.message, /403/, 'no status code in what the user sees');
+      return true;
+    },
   );
 });
 
@@ -91,17 +96,19 @@ test('fetchSubmissionSourceText: an already-aborted signal rejects (same as real
 
 const { describeSubmissionPageFailure, loadSourceInFrame } = await import('../src/services/codeforcesApi.ts');
 
-test('refusal wording: bot protection is told apart from a plain 403', () => {
+test('refusal wording: bot protection is told apart from a plain 403, and no status code is shown', () => {
   const challenge = describeSubmissionPageFailure(403, '<title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/h/b"></script>');
   assert.match(challenge, /bot protection/);
-  assert.match(challenge, /403/);
+  assert.doesNotMatch(challenge, /403/);
 
   const plain = describeSubmissionPageFailure(403, '');
-  assert.match(plain, /forbidden/);
-  assert.match(plain, /403/);
+  assert.match(plain, /permission/);
+  assert.doesNotMatch(plain, /403/);
   assert.doesNotMatch(plain, /bot protection/);
 
-  assert.match(describeSubmissionPageFailure(500, ''), /status 500/);
+  const other = describeSubmissionPageFailure(500, '');
+  assert.match(other, /Could not load/);
+  assert.doesNotMatch(other, /500/);
 });
 
 type FakeFrame = {
@@ -209,7 +216,7 @@ test('fetchSubmissionSourceText: a 403 that the frame cannot fix still reports t
   installDocument({ querySelector: () => null });
   globalThis.fetch = (async () => new Response('', { status: 403 })) as typeof fetch;
 
-  await assert.rejects(fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1'), /403/);
+  await assert.rejects(fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1'), /permission/);
 });
 
 test('fetchSubmissionSourceText: other statuses are not retried in a frame', async () => {
@@ -217,6 +224,6 @@ test('fetchSubmissionSourceText: other statuses are not retried in a frame', asy
   const frames = installDocument({ querySelector: () => ({ textContent: 'x', innerHTML: 'x' }) });
   globalThis.fetch = (async () => new Response('', { status: 500 })) as typeof fetch;
 
-  await assert.rejects(fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1'), /500/);
+  await assert.rejects(fetchSubmissionSourceText('https://codeforces.com/contest/1/submission/1'), /Could not load/);
   assert.equal(frames.length, 0);
 });
