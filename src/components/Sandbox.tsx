@@ -49,12 +49,23 @@ export function Sandbox({
         return;
       }
 
+      /*
+       * A submission's source box opened from inside this one has its own
+       * Escape handler and closes first; the same key press must not also
+       * close this box. This listener runs in the capture phase, so the
+       * source box is still in the page when it looks, whichever order
+       * the two handlers were added in.
+       */
+      if (document.getElementById('cfpm-submission-sandbox')) {
+        return;
+      }
+
       onClose();
     };
 
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
 
-    return () => document.removeEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [onClose]);
 
   const backdropStyle: CSSProperties = {
