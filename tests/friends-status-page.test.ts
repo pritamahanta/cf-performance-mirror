@@ -256,6 +256,22 @@ test('plan: an empty page answer skips everyone', () => {
   assert.deepEqual(plan.skip, ['Ann', 'bob']);
 });
 
+test('plan: a forced handle is looked up even when the page does not list it (any letter case)', () => {
+  const answer = new Map([['ann', [5]]]);
+  const plan = planFriendScan(['Ann', 'bob', 'Me'], answer, ['me']);
+
+  assert.deepEqual(plan.skip, ['bob']);
+  assert.deepEqual(plan.scan, [{ handle: 'Ann', ids: [5] }, { handle: 'Me', ids: [] }]);
+});
+
+test('plan: a forced handle the page does list keeps the ids the page showed', () => {
+  const answer = new Map([['me', [7]]]);
+  const plan = planFriendScan(['Me'], answer, ['Me']);
+
+  assert.deepEqual(plan.skip, []);
+  assert.deepEqual(plan.scan, [{ handle: 'Me', ids: [7] }]);
+});
+
 /* ---------- a stored copy must contain what the page showed ---------- */
 
 const sub = (id: number): FriendSubmission => ({ id, index: 'B', createdAt: 1_000 + id });

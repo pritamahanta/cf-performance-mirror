@@ -18,6 +18,7 @@ import type {
 
 import { UserFacingError, fetchUsersInfoPaced } from '../services/codeforcesApi';
 import { loadFriendHandles } from '../services/friendsList';
+import { getLoggedInHandle } from '../services/onlineStore';
 
 import {
   loadCachedUserInfo,
@@ -35,6 +36,9 @@ export type FriendsListState =
 
 export interface FriendSubmissionRow {
   handle: string;
+
+  /* The logged-in user's own row (not a friend); the box labels it. */
+  isSelf?: boolean;
   rank?: string;
   rating?: number;
   summary: FriendProblemSummary;
@@ -43,10 +47,13 @@ export interface FriendSubmissionRow {
 export interface FriendSubmissionsFeed {
   list: FriendsListState;
 
-  /* Friends with at least one submission on this problem, best first. */
+  /*
+   * Friends with at least one submission on this problem, best first,
+   * plus the user's own row (flagged `isSelf`) when they have one.
+   */
   rows: FriendSubmissionRow[];
 
-  /* True until every friend has been checked (or has failed). */
+  /* True until every friend (and the user) has been checked (or has failed). */
   busy: boolean;
 
   /* Friends whose submissions could not be loaded (or refreshed: their old copy stays on screen). */
@@ -126,9 +133,30 @@ export function useFriendSubmissionsFeed(
     };
   }, [active]);
 
-  const handles = useMemo(
+  const friendHandles = useMemo(
     () => (list.status === 'ready' ? list.handles : NO_HANDLES),
     [list],
+  );
+
+  /*
+   * The logged-in user's own handle, so their submissions can be shown too
+   * (marked as theirs). Read once: it cannot change without a page load.
+   * Added only when the user has friends (an empty list keeps its own
+   * message) and is not already in the list.
+   */
+  const [loggedIn] = useState(() => getLoggedInHandle());
+
+  const selfHandle =
+    loggedIn !== null &&
+    friendHandles.length > 0 &&
+    !friendHandles.some(handle => handle.toLowerCase() === loggedIn.toLowerCase())
+      ? loggedIn
+      : null;
+
+  /* Everyone whose submissions are looked up: the friends, then the user. */
+  const handles = useMemo(
+    () => (selfHandle === null ? friendHandles : [...friendHandles, selfHandle]),
+    [friendHandles, selfHandle],
   );
 
   /*
@@ -225,6 +253,7 @@ export function useFriendSubmissionsFeed(
     handles,
     active,
     infoSettled,
+    selfHandle,
   );
 
   const rows = useMemo(() => {
@@ -244,6 +273,10 @@ export function useFriendSubmissionsFeed(
 
         result.push({
           handle: info?.handle ?? handle,
+          isSelf:
+            selfHandle !== null && handle.toLowerCase() === selfHandle.toLowerCase()
+              ? true
+              : undefined,
           rank: info?.rank,
           rating: info?.rating,
           summary,
@@ -252,12 +285,16 @@ export function useFriendSubmissionsFeed(
     }
 
     return result.sort(compareSummaries);
-  }, [handles, entries, infos, problem.index]);
+  }, [handles, entries, infos, problem.index, selfHandle]);
 
+  /*
+   * The counts below are about friends only: the user's own row is extra,
+   * so "N checked friends" and "x / t with submissions" stay true.
+   */
   let failed = 0;
   let pending = 0;
 
-  for (const handle of handles) {
+  for (const handle of friendHandles) {
     const entry = entries[handle.toLowerCase()];
 
     if (entry?.status === 'error' || (entry?.status === 'ready' && entry.stale === 'failed')) {
@@ -267,12 +304,18 @@ export function useFriendSubmissionsFeed(
     }
   }
 
+  const selfEntry = selfHandle === null ? undefined : entries[selfHandle.toLowerCase()];
+  const selfPending =
+    selfHandle !== null && selfEntry?.status !== 'ready' && selfEntry?.status !== 'error';
+
   return {
     list,
     rows,
-    busy: list.status === 'loading' || (handles.length > 0 && pending > 0),
+    busy:
+      list.status === 'loading' ||
+      (friendHandles.length > 0 && (pending > 0 || selfPending)),
     failed,
     updating: countUpdating(entries, handles),
-    checked: handles.length - pending,
+    checked: friendHandles.length - pending,
   };
 }

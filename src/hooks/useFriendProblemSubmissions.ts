@@ -89,6 +89,7 @@ export function useFriendProblemSubmissions(
   handles: readonly string[],
   active: boolean,
   fetching: boolean = true,
+  alwaysScan: string | null = null,
 ): FriendProblemSubmissions {
   const [entries, setEntries] =
     useState<FriendEntries>({});
@@ -281,6 +282,7 @@ export function useFriendProblemSubmissions(
       planFriendScan(
         handlesKey.split('\n'),
         onProblem,
+        alwaysScan ? [alwaysScan] : [],
       );
 
     /*
@@ -331,7 +333,7 @@ export function useFriendProblemSubmissions(
     return () => {
       cancelled = true;
     };
-  }, [active, fetching, lookupSettled, onProblem, contestId, handlesKey]);
+  }, [active, fetching, lookupSettled, onProblem, contestId, handlesKey, alwaysScan]);
 
   return { entries };
 }

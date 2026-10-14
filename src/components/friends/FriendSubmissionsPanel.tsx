@@ -30,6 +30,13 @@ const MESSAGE_STYLE = {
   textAlign: 'center' as const,
 };
 
+/* The marker after the user's own handle, so their row is not mistaken for a friend's. */
+const SELF_LABEL_STYLE = {
+  marginLeft: '0.35em',
+  fontSize: '0.85em',
+  opacity: 0.7,
+};
+
 const NOTE_STYLE = {
   padding: '0.25em 1em',
   fontSize: '0.85em',
@@ -91,11 +98,13 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
    * the scan is still running, not only once it finishes. While old
    * results are on screen and being refreshed, it says so instead.
    */
+  const friendRows = feed.rows.filter(row => !row.isSelf).length;
+
   const footerLabel =
     feed.list.status === 'ready' && totalFriends > 0
       ? feed.updating > 0
         ? updatingLabel(feed.updating)
-        : `${feed.rows.length} / ${feed.checked} with submissions`
+        : `${friendRows} / ${feed.checked} with submissions`
       : '\u00a0';
 
   return (
@@ -161,6 +170,7 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
                   {feed.rows.map((row, index) => {
                     const dark = index % 2 === 0;
                     const { summary } = row;
+                    const owner = row.isSelf ? 'your' : `${row.handle}'s`;
 
                     return (
                       <tr key={row.handle}>
@@ -183,14 +193,16 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
 
                         <td className={dark ? 'dark' : ''}>
                           <RatedHandle handle={row.handle} rank={row.rank} />
+
+                          {row.isSelf && <span style={SELF_LABEL_STYLE}>(self)</span>}
                         </td>
 
                         <td className={dark ? 'dark' : ''}>
                           <button
                             type="button"
                             className="cfpm-fsubs-count"
-                            title={`Show ${row.handle}'s submissions for this problem`}
-                            aria-label={`Show ${row.handle}'s ${summary.submissions.length} submissions for this problem`}
+                            title={`Show ${owner} submissions for this problem`}
+                            aria-label={`Show ${owner} ${summary.submissions.length} submissions for this problem`}
                             aria-haspopup="dialog"
                             aria-expanded={openFriend?.handle === row.handle}
                             onClick={event => {
@@ -229,7 +241,13 @@ export function FriendSubmissionsPanel({ problem }: { problem: ProblemRef }) {
           {opened && openFriend && (
             <FriendSubmissionsPopup
               key={opened.handle}
-              title={<RatedHandle handle={opened.handle} rank={opened.rank} />}
+              title={
+                <>
+                  <RatedHandle handle={opened.handle} rank={opened.rank} />
+
+                  {opened.isSelf && <span style={SELF_LABEL_STYLE}>(self)</span>}
+                </>
+              }
               handle={opened.handle}
               problem={problem}
               submissions={opened.summary.submissions}

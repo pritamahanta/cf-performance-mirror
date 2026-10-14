@@ -241,13 +241,19 @@ export async function loadFriendsOnProblem(
  * problem (no request needed); `scan` are the ones to look up, each with
  * the ids of the submissions the page showed (the looked-up copy must
  * contain them). With no page answer (null) everyone is scanned.
+ *
+ * `always` are handles that are scanned even when the page does not list
+ * them (the page is about friends, so it is not known to cover the user's
+ * own submissions).
  */
 export function planFriendScan(
   handles: readonly string[],
   onProblem: FriendIdsByHandle | null,
+  always: readonly string[] = [],
 ): { skip: string[]; scan: Array<{ handle: string; ids: number[] }> } {
   const skip: string[] = [];
   const scan: Array<{ handle: string; ids: number[] }> = [];
+  const forced = new Set(always.map(handle => handle.toLowerCase()));
 
   for (const handle of handles) {
     const key = handle.toLowerCase();
@@ -256,6 +262,8 @@ export function planFriendScan(
       scan.push({ handle, ids: [] });
     } else if (onProblem.has(key)) {
       scan.push({ handle, ids: onProblem.get(key) ?? [] });
+    } else if (forced.has(key)) {
+      scan.push({ handle, ids: [] });
     } else {
       skip.push(handle);
     }
