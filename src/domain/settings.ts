@@ -4,7 +4,14 @@ import { VALID_TIMELINE_VALUES } from '../types/settings';
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   category: 'Div4', mode: 'total', timeline: 'all', sortMode: 'errors',
   hideAC: false, hideTags: false, hideRatings: false, solvedOnly: false,
-  minAttempts: 1, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
+  /*
+   * The Problems list's "Min. wrong attempts" filter. 0 lists every problem
+   * with a submission, including ones solved without a single wrong one.
+   * It is saved under its own name (it used to be `minAttempts`, whose
+   * lowest value was 1), so a value saved back then, which only meant "no
+   * minimum", does not keep hiding those problems.
+   */
+  minWrongAttempts: 0, ratingMin: '', ratingMax: '', customStart: '', customEnd: '',
   tagFilters: [], customContestFrom: '', customContestTo: '',
   problemsCategory: 'Div4', problemsMode: 'total', problemsTimeline: 'all',
   problemsCustomStart: '', problemsCustomEnd: '',
@@ -62,7 +69,7 @@ export function normalizeSettings(saved: SavedSettings): ExtensionSettings {
     hideTags: saved.hideTags ?? DEFAULT_SETTINGS.hideTags,
     hideRatings: saved.hideRatings ?? DEFAULT_SETTINGS.hideRatings,
     solvedOnly: saved.solvedOnly ?? DEFAULT_SETTINGS.solvedOnly,
-    minAttempts: saved.minAttempts !== undefined ? Math.max(1, saved.minAttempts) : DEFAULT_SETTINGS.minAttempts,
+    minWrongAttempts: saved.minWrongAttempts !== undefined ? Math.max(0, saved.minWrongAttempts) : DEFAULT_SETTINGS.minWrongAttempts,
     ratingMin: saved.ratingMin ?? DEFAULT_SETTINGS.ratingMin,
     ratingMax: saved.ratingMax ?? DEFAULT_SETTINGS.ratingMax,
     customStart: saved.customStart ?? DEFAULT_SETTINGS.customStart,

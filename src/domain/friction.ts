@@ -21,7 +21,7 @@ export interface FrictionFilters {
   solvedOnly: boolean;
   hideTags: boolean;
   hideRatings: boolean;
-  minAttempts: number;
+  minWrongAttempts: number;
   ratingMin: string;
   ratingMax: string;
   tagFilters: string[];
@@ -60,7 +60,7 @@ export function filterFrictionProblems(
     : null;
 
   return problems
-    .filter(problem => totalErrors(problem) >= filters.minAttempts)
+    .filter(problem => totalErrors(problem) >= filters.minWrongAttempts)
     .filter(problem => !filters.solvedOnly || problem.solved)
     .filter(problem => !filters.hideAC || !problem.solved)
     .filter(problem => filters.tagFilters.length === 0 || filters.tagFilters.every(tag => (problem.tags || []).includes(tag)))

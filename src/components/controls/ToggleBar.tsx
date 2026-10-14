@@ -153,7 +153,7 @@ const VIEWS: Array<{
   {
     view: 'problems',
     label: 'Problems',
-    hint: 'Opens a window listing the problems you got errors on, with filters and the submissions behind each count.',
+    hint: 'Opens a window listing the problems you submitted, with filters and the submissions behind each count.',
     icon: (
       <Icon>
         <path d="M3.5 1.5h6l3 3v10h-9z" />

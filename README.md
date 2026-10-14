@@ -22,7 +22,7 @@ The Friends submissions box is a second, separate feature, **on by default**, th
 ## How to use it (profile page)
 
 - **Timings** opens a box with the average and median solve time, solved count, attempts and failure rate for each problem letter.
-- **Problems** opens a box listing the problems you got errors on, with filters, sorting and the submissions behind each count.
+- **Problems** opens a box listing the problems you submitted (including ones solved with no wrong attempt), with filters, sorting and the submissions behind each count.
 - Both boxes have their own **category** (Div1 … Other), **time range** and **Total / Rated / Unrated** controls, and say what is being counted in their header.
 - Close a box with the ✕, by clicking outside it, or with Esc.
 - **Friends** and **Submissions** switch the Online Friends and Friends submissions sidebar boxes on or off. Both are on by default.

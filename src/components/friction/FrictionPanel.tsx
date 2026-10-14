@@ -92,20 +92,20 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
     solvedOnly: settings.solvedOnly,
     hideTags: settings.hideTags,
     hideRatings: settings.hideRatings,
-    minAttempts: settings.minAttempts,
+    minWrongAttempts: settings.minWrongAttempts,
     ratingMin: settings.ratingMin,
     ratingMax: settings.ratingMax,
     tagFilters: settings.tagFilters,
   };
 
   const problems = useMemo(() => getProblems(source), [modeData, category, source]);
-  const filtered = useMemo(() => filterFrictionProblems(problems, filters), [problems, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
+  const filtered = useMemo(() => filterFrictionProblems(problems, filters), [problems, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minWrongAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
   const sorted = useMemo(() => sortFrictionProblems(filtered, sort), [filtered, sort]);
   const availableTags = useMemo(() => getAvailableTags(problems), [problems]);
   const sourceCounts = useMemo(() => ({
     category: filterFrictionProblems(getProblems('category'), filters).length,
     practice: filterFrictionProblems(getProblems('practice'), filters).length,
-  }), [modeData, category, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
+  }), [modeData, category, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minWrongAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
 
   const visibleTags = useMemo(() => {
     const combined = Array.from(new Set([...ALL_CF_TAGS, ...availableTags, ...settings.tagFilters])).sort();
@@ -132,7 +132,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
       });
   };
 
-  const activeFilter = settings.tagFilters.length > 0 || settings.minAttempts !== 1 || settings.ratingMin !== '' || settings.ratingMax !== '';
+  const activeFilter = settings.tagFilters.length > 0 || settings.minWrongAttempts !== 0 || settings.ratingMin !== '' || settings.ratingMax !== '';
   const activeView = settings.hideAC || settings.solvedOnly || settings.hideTags || settings.hideRatings;
 
   return (
@@ -289,9 +289,9 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
         }}>
           {!sorted.length ? (
             <div style={{ padding: '24px 14px', color: theme.emptyText, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>
-              {settings.tagFilters.length || settings.ratingMin || settings.ratingMax || settings.solvedOnly || settings.hideAC
+              {settings.tagFilters.length || settings.ratingMin || settings.ratingMax || settings.solvedOnly || settings.hideAC || settings.minWrongAttempts > 0
                 ? 'No problems match the selected filters.'
-                : 'No problems with errors found.'}
+                : 'No problems found.'}
             </div>
           ) : (
             <>
@@ -341,7 +341,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
 
 function filterTitle(settings: ExtensionSettings) {
   const parts: string[] = [];
-  if (settings.minAttempts !== 1) parts.push(`Min ${settings.minAttempts} errors`);
+  if (settings.minWrongAttempts !== 0) parts.push(`Min ${settings.minWrongAttempts} errors`);
   if (settings.ratingMin !== '' || settings.ratingMax !== '') parts.push(`Rating ${settings.ratingMin || 'any'}–${settings.ratingMax || 'any'}`);
   if (settings.tagFilters.length) parts.push(`${settings.tagFilters.length} topic${settings.tagFilters.length > 1 ? 's' : ''}`);
   return parts.length ? `Filters: ${parts.join(', ')}` : 'Filter';
@@ -402,11 +402,11 @@ function FilterMenu({ settings, theme, onChange, onOpenTopics }: {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <span style={{ fontSize: 12, color: theme.text, whiteSpace: 'nowrap' }}>Min. wrong attempts</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-            <button className="cfpm-step-btn" style={{ background: theme.btnBg, border: `1px solid ${theme.btnBorder}`, color: theme.text }} disabled={settings.minAttempts <= 1} onClick={() => onChange({ minAttempts: Math.max(1, settings.minAttempts - 1) })}>
+            <button className="cfpm-step-btn" style={{ background: theme.btnBg, border: `1px solid ${theme.btnBorder}`, color: theme.text }} disabled={settings.minWrongAttempts <= 0} onClick={() => onChange({ minWrongAttempts: Math.max(0, settings.minWrongAttempts - 1) })}>
               <svg width="8" height="2" viewBox="0 0 8 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="0" y1="1" x2="8" y2="1" /></svg>
             </button>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 28, height: 24, fontSize: 13, fontWeight: 700, color: theme.text, borderRadius: 4, background: theme.inputBg, border: `1px solid ${theme.btnBorder}` }}>{settings.minAttempts}</span>
-            <button className="cfpm-step-btn" style={{ background: theme.btnBg, border: `1px solid ${theme.btnBorder}`, color: theme.text }} disabled={settings.minAttempts >= 99} onClick={() => onChange({ minAttempts: Math.min(99, settings.minAttempts + 1) })}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 28, height: 24, fontSize: 13, fontWeight: 700, color: theme.text, borderRadius: 4, background: theme.inputBg, border: `1px solid ${theme.btnBorder}` }}>{settings.minWrongAttempts}</span>
+            <button className="cfpm-step-btn" style={{ background: theme.btnBg, border: `1px solid ${theme.btnBorder}`, color: theme.text }} disabled={settings.minWrongAttempts >= 99} onClick={() => onChange({ minWrongAttempts: Math.min(99, settings.minWrongAttempts + 1) })}>
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="0" x2="4" y2="8" /><line x1="0" y1="4" x2="8" y2="4" /></svg>
             </button>
           </div>

@@ -3,7 +3,6 @@ import { CATEGORIES, DEFAULT_INDICES } from '../types/settings';
 import type { Category } from '../types/settings';
 import type { DeltaInfo, ModeData, ProblemEntry, ResolvedTimeline } from '../types/performance';
 import { classifyContest, decideUserDivisionForContest } from './classification';
-import { totalErrors } from './utils';
 
 interface EngineInput {
   contestMap: Record<number, CodeforcesContest>;
@@ -333,7 +332,7 @@ export class PerformanceEngine {
 
     const categoryRawProblems = {} as ModeData['categoryRawProblems'];
     CATEGORIES.forEach(category => {
-      categoryRawProblems[category] = Array.from(categoryRawWAMap[category].values()).filter(problem => totalErrors(problem) > 0);
+      categoryRawProblems[category] = Array.from(categoryRawWAMap[category].values());
     });
 
     const practiceRawWAMap = new Map<string, ProblemEntry>();
@@ -364,7 +363,7 @@ export class PerformanceEngine {
       categoryIndexWrongIds,
       categoryIndexAcIds,
       categoryRawProblems,
-      practiceRawProblems: Array.from(practiceRawWAMap.values()).filter(problem => totalErrors(problem) > 0),
+      practiceRawProblems: Array.from(practiceRawWAMap.values()),
       participatedCount: participated.size,
       categoryContestCount: Object.fromEntries(CATEGORIES.map(category => [category, categoryContestSets[category].size])) as Record<Category, number>,
       submissionTimingMap,

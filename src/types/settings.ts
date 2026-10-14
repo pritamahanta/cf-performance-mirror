@@ -12,7 +12,7 @@ export interface SavedSettings {
   hideTags?: boolean;
   hideRatings?: boolean;
   solvedOnly?: boolean;
-  minAttempts?: number;
+  minWrongAttempts?: number;
   ratingMin?: string;
   ratingMax?: string;
   customStart?: string;
@@ -42,7 +42,7 @@ export interface ExtensionSettings {
   hideTags: boolean;
   hideRatings: boolean;
   solvedOnly: boolean;
-  minAttempts: number;
+  minWrongAttempts: number;
   ratingMin: string;
   ratingMax: string;
   customStart: string;
