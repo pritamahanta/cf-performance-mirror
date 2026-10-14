@@ -68,6 +68,35 @@ export function noSubmissionsMessage(checked: number): string {
     : `None of your ${checked} checked friends has submitted this problem.`;
 }
 
+/* ---- Problems box ---- */
+
+export const OMITTED_PROBLEMS_HINT =
+  "Problems from gym contests, or from contests missing from Codeforces' regular contest list, can't be shown here, so totals here can differ from ones that include them.";
+
+/*
+ * The small line under the Problems list saying how many problems it
+ * leaves out; null when it leaves out none.
+ */
+export function omittedProblemsNote(omitted: { gym: number; other: number }): string | null {
+  const total = omitted.gym + omitted.other;
+
+  if (total <= 0) {
+    return null;
+  }
+
+  const parts: string[] = [];
+
+  if (omitted.gym > 0) {
+    parts.push(`${omitted.gym} gym`);
+  }
+
+  if (omitted.other > 0) {
+    parts.push(`${omitted.other} other`);
+  }
+
+  return `Not included: ${parts.join(' and ')} problem${total === 1 ? '' : 's'} (outside Codeforces' regular contest list).`;
+}
+
 export function failedNote(failed: number): string {
   return failed === 1
     ? "1 friend couldn't be checked."

@@ -54,6 +54,13 @@ export interface ModeData {
   categoryIndexAcIds: Record<Category, Record<string, number[]>>;
   categoryRawProblems: Record<Category, ProblemEntry[]>;
   practiceRawProblems: ProblemEntry[];
+  /*
+   * How many distinct problems, among the submissions in the chosen period,
+   * could not be listed because their contest is not in Codeforces' regular
+   * contest list (gym contests, or a contest the list does not know), or
+   * the problem has no contest number at all (acm.sgu.ru, say).
+   */
+  omittedProblems: { gym: number; other: number };
   participatedCount: number;
   categoryContestCount: Record<Category, number>;
   submissionTimingMap: Map<number, SubmissionTiming>;

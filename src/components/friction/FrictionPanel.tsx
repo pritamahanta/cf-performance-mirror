@@ -15,6 +15,7 @@ import {
   type FrictionSource,
   type SubmissionVerdictKey,
 } from '../../domain/friction';
+import { OMITTED_PROBLEMS_HINT, omittedProblemsNote } from '../../domain/panelNotices';
 import { useProblemSolvedCounts } from '../../hooks/useProblemSolvedCounts';
 import { SubmissionPopup, type SubmissionVerdicts as PopupVerdicts } from './SubmissionPopup';
 
@@ -131,6 +132,8 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
         problemIndex: problem.index, problemName: problem.name, problemContestName: problem.contestName,
       });
   };
+
+  const omittedNote = omittedProblemsNote(modeData.omittedProblems);
 
   const activeFilter = settings.tagFilters.length > 0 || settings.minWrongAttempts !== 0 || settings.ratingMin !== '' || settings.ratingMax !== '';
   const activeView = settings.hideAC || settings.solvedOnly || settings.hideTags || settings.hideRatings;
@@ -312,6 +315,18 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
             </>
           )}
         </div>
+
+        {omittedNote && (
+          <div
+            title={OMITTED_PROBLEMS_HINT}
+            style={{
+              flexShrink: 0, padding: '4px 12px', fontSize: 11, textAlign: 'center',
+              color: theme.muted, borderTop: `1px solid ${theme.borderLighter}`,
+            }}
+          >
+            {omittedNote}
+          </div>
+        )}
 
         {popup && (
           <SubmissionPopup

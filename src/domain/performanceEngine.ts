@@ -4,6 +4,9 @@ import type { Category } from '../types/settings';
 import type { DeltaInfo, ModeData, ProblemEntry, ResolvedTimeline } from '../types/performance';
 import { classifyContest, decideUserDivisionForContest } from './classification';
 
+/* Gym contest ids start here (same rule as buildSubmissionUrl). */
+const GYM_CONTEST_ID_MIN = 100001;
+
 interface EngineInput {
   contestMap: Record<number, CodeforcesContest>;
   rawSubmissions: CodeforcesSubmission[];
@@ -356,6 +359,23 @@ export class PerformanceEngine {
       else recordVerdict(problem, submission.verdict, submission.id);
     });
 
+    /*
+     * A submission is only placed in the lists above when its contest is in
+     * contestMap (Codeforces' regular contest list: gym contests are not in
+     * it). The rest are counted, once per problem, so the Problems box can
+     * say how many it leaves out.
+     */
+    const omittedGym = new Set<string>();
+    const omittedOther = new Set<string>();
+    filteredSubmissions.forEach(submission => {
+      const problem = submission.problem;
+      if (!problem) return;
+      const contestId = problem.contestId;
+      if (typeof contestId === 'number' && this.contestMap[contestId]) return;
+      const key = `${contestId ?? problem.problemsetName ?? ''}-${problem.index}`;
+      (typeof contestId === 'number' && contestId >= GYM_CONTEST_ID_MIN ? omittedGym : omittedOther).add(key);
+    });
+
     return {
       categoryIndexTimes,
       categoryIndexAttempts,
@@ -364,6 +384,7 @@ export class PerformanceEngine {
       categoryIndexAcIds,
       categoryRawProblems,
       practiceRawProblems: Array.from(practiceRawWAMap.values()),
+      omittedProblems: { gym: omittedGym.size, other: omittedOther.size },
       participatedCount: participated.size,
       categoryContestCount: Object.fromEntries(CATEGORIES.map(category => [category, categoryContestSets[category].size])) as Record<Category, number>,
       submissionTimingMap,

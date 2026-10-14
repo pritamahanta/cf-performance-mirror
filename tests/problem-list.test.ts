@@ -91,3 +91,56 @@ test('settings: a saved min wrong attempts is kept, never below 0', () => {
   assert.equal(normalizeSettings({ minWrongAttempts: 3 }).minWrongAttempts, 3);
   assert.equal(normalizeSettings({ minWrongAttempts: -2 }).minWrongAttempts, 0);
 });
+
+/* ---------- problems the list cannot hold ---------- */
+
+const { omittedProblemsNote } = await import('../src/domain/panelNotices.ts');
+
+function rawSubmission(id: number, problem: Record<string, unknown>, at: number): CodeforcesSubmission {
+  return {
+    id,
+    creationTimeSeconds: at,
+    verdict: 'OK',
+    problem: { name: 'X', tags: [], ...problem },
+  } as unknown as CodeforcesSubmission;
+}
+
+test('omitted problems: gym, unlisted-contest and contest-less problems are counted once each; listed ones are not', () => {
+  const later = START + 100_000 + DURATION + 9_000;
+  const withOthers = new PerformanceEngine({
+    contestMap,
+    rawSubmissions: [
+      submission(1, 900, 'A', 'OK', START + 600),
+      rawSubmission(10, { contestId: 100500, index: 'A' }, later),
+      rawSubmission(11, { contestId: 100500, index: 'A' }, later + 10),
+      rawSubmission(12, { contestId: 100500, index: 'B' }, later + 20),
+      rawSubmission(13, { contestId: 777, index: 'C' }, later + 30),
+      rawSubmission(14, { problemsetName: 'acmsguru', index: '100' }, later + 40),
+    ],
+    ratedContestSet: new Set<number>(),
+    userRatingHistory: [],
+  }).recalc('total', 'all', NOW);
+
+  assert.deepEqual(withOthers.omittedProblems, { gym: 2, other: 2 });
+  assert.deepEqual(withOthers.categoryRawProblems.Div2.map(problem => problem.pid), ['900-A']);
+});
+
+test('omitted problems: nothing is omitted when every submission is in a listed contest', () => {
+  assert.deepEqual(data.omittedProblems, { gym: 0, other: 0 });
+});
+
+test('omitted problems note: wording, plural and nothing-to-say', () => {
+  assert.equal(omittedProblemsNote({ gym: 0, other: 0 }), null);
+  assert.equal(
+    omittedProblemsNote({ gym: 1, other: 0 }),
+    "Not included: 1 gym problem (outside Codeforces' regular contest list).",
+  );
+  assert.equal(
+    omittedProblemsNote({ gym: 12, other: 3 }),
+    "Not included: 12 gym and 3 other problems (outside Codeforces' regular contest list).",
+  );
+  assert.equal(
+    omittedProblemsNote({ gym: 0, other: 2 }),
+    "Not included: 2 other problems (outside Codeforces' regular contest list).",
+  );
+});
