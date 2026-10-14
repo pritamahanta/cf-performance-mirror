@@ -116,6 +116,12 @@ loading the same page in a hidden frame on codeforces.com. The source is kept in
 memory only (up to 25 submissions, until the Codeforces page is closed or
 reloaded) and is not stored on disk.
 
+From the Friends submissions list, opening a submission also asks the
+Codeforces `contest.standings` API, without login, for the contest's name
+and its problem list, to show the contest and problem name above the
+source code. This is asked once per contest (not once per submission) and
+the answer is kept in memory only, for as long as the page stays open.
+
 ## What is not collected
 
 No personally identifiable information beyond what Codeforces itself

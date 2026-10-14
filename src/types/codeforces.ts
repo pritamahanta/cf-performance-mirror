@@ -41,6 +41,12 @@ export interface CodeforcesSubmission {
   memoryConsumedBytes?: number;
 }
 
+/* The part of contest.standings' result this extension reads: the contest's own name and its problem list (with each problem's name). */
+export interface CodeforcesStandings {
+  contest: CodeforcesContest;
+  problems: CodeforcesProblem[];
+}
+
 export interface CodeforcesRatingChange {
   contestId: number;
   contestName: string;

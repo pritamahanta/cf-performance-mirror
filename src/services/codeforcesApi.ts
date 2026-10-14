@@ -2,6 +2,7 @@ import type {
   CodeforcesApiResponse,
   CodeforcesContest,
   CodeforcesRatingChange,
+  CodeforcesStandings,
   CodeforcesSubmission,
   CodeforcesUser,
 } from '../types/codeforces';
@@ -224,6 +225,31 @@ export async function fetchContests(): Promise<
   }
 
   return data.result ?? [];
+}
+
+/*
+ * A contest's own name and its full problem list (each with its own
+ * name) - from the first row of its standings, since that reply carries
+ * the whole problem list regardless of "count". Public, no login needed,
+ * for any regular contest, same as fetchContests above.
+ */
+export async function fetchContestStandingsHeader(
+  contestId: number,
+): Promise<CodeforcesStandings> {
+  const data =
+    await get<CodeforcesStandings>(
+      `/contest.standings?contestId=${contestId}&from=1&count=1`,
+    );
+
+  if (data.status !== 'OK' || !data.result) {
+    throw new UserFacingError(
+      friendlyApiMessage(
+        data.comment,
+      ),
+    );
+  }
+
+  return data.result;
 }
 
 /*

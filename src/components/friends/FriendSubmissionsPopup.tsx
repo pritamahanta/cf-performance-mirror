@@ -26,6 +26,8 @@ import type {
 } from '../../domain/friendSubmissions';
 
 import { useTheme } from '../../hooks/useTheme';
+import { loadContestProblemInfo } from '../../services/contestProblemInfoCache';
+import type { ContestProblemInfo } from '../../services/contestProblemInfoCache';
 import { SubmissionSourceOverlay } from '../SubmissionSourceOverlay';
 
 /*
@@ -158,6 +160,34 @@ export function FriendSubmissionsPopup({
 }: Props) {
   const [openedSubmission, setOpenedSubmission] =
     useState<FriendSubmission | null>(null);
+
+  const [contestInfo, setContestInfo] =
+    useState<ContestProblemInfo | null>(null);
+
+  /*
+   * Fetched only once a submission's source is actually being opened
+   * (not just the friend's list), and only the first time per contest -
+   * see loadContestProblemInfo. A failure (or a submission closed again
+   * before it resolves) just leaves contestInfo unset, so the header
+   * falls back to the problem's letter alone.
+   */
+  useEffect(() => {
+    if (!openedSubmission) {
+      return;
+    }
+
+    let cancelled = false;
+
+    loadContestProblemInfo(problem).then(info => {
+      if (!cancelled) {
+        setContestInfo(info);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [openedSubmission, problem]);
 
   /*
    * Read inside the outside-click/scroll/resize effect below without
@@ -885,8 +915,14 @@ export function FriendSubmissionsPopup({
               openedSubmission.id
             }
             handle={handle}
+            contestName={
+              contestInfo?.contestName
+            }
             problemIndex={
               problem.index
+            }
+            problemName={
+              contestInfo?.problemName
             }
             verdictLabel={
               <span
