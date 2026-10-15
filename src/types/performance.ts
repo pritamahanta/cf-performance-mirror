@@ -20,6 +20,13 @@ export interface ProblemEntry {
    * `solved` without this means it was solved only after the contest.
    */
   solvedInContest: boolean;
+  /*
+   * Whether the problem had at least one submission, right or wrong, while its
+   * contest was running (same judging and scope as `solvedInContest`). A
+   * problem solved only after the contest is an upsolve only if this is true;
+   * otherwise it was just practised.
+   */
+  attemptedInContest: boolean;
   wa: number;
   tle: number;
   rte: number;

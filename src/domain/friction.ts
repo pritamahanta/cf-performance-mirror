@@ -73,16 +73,18 @@ export function filterFrictionProblems(
     });
 }
 
-export type SolveStatus = 'contest' | 'after' | 'unsolved';
+export type SolveStatus = 'solved' | 'upsolved' | 'unsolved';
 
 /*
- * When a problem was solved: 'contest' (accepted while its contest was
- * running), 'after' (accepted, but only after the contest ended) or
- * 'unsolved'.
+ * 'upsolved' is a problem the user touched during its contest without
+ * getting it accepted then, and solved afterwards. One accepted during the
+ * contest, or first attempted only in practice, is plain 'solved'.
  */
-export function solveStatus(problem: Pick<ProblemEntry, 'solved' | 'solvedInContest'>): SolveStatus {
+export function solveStatus(
+  problem: Pick<ProblemEntry, 'solved' | 'solvedInContest' | 'attemptedInContest'>,
+): SolveStatus {
   if (!problem.solved) return 'unsolved';
-  return problem.solvedInContest ? 'contest' : 'after';
+  return !problem.solvedInContest && problem.attemptedInContest ? 'upsolved' : 'solved';
 }
 
 export function sortFrictionProblems(problems: readonly ProblemEntry[], sort: 'errors' | 'rating'): ProblemEntry[] {

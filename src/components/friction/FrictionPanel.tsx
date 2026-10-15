@@ -630,8 +630,8 @@ function gridColumns(hideRatings: boolean): string {
  */
 function tableLook(theme: Theme) {
   return theme.isDark
-    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText, upsolved: theme.tleBg, upsolvedText: theme.tleFg }
-    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20', upsolved: '#ffecb3', upsolvedText: '#7a4b00' };
+    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText }
+    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20' };
 }
 
 /* Links look like Codeforces links: blue and underlined, purple once visited (see .cfpm-prob-link). */
@@ -722,9 +722,9 @@ function ProblemRow({
   const errors = totalErrors(problem);
   const look = tableLook(theme);
   const status = solveStatus(problem);
-  /* Solved during the contest is green, solved only after it is amber. */
-  const statusFill = status === 'contest' ? look.solved : status === 'after' ? look.upsolved : 'transparent';
-  const statusText = status === 'contest' ? look.solvedText : status === 'after' ? look.upsolvedText : theme.muted;
+  /* Solved and upsolved look the same (green); only the label tells them apart. */
+  const statusFill = status === 'unsolved' ? 'transparent' : look.solved;
+  const statusText = status === 'unsolved' ? theme.muted : look.solvedText;
   const problemUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
   const sourceLabel = source === 'category' ? 'in-contest' : 'practice';
   const { ids, verdicts } = collectSubmissions(problem, theme);
@@ -738,7 +738,7 @@ function ProblemRow({
     minHeight: 36,
     padding: '4px 10px',
     boxSizing: 'border-box',
-    /* Solved rows carry the same green edge Codeforces gives them (amber when solved only after the contest). */
+    /* Solved rows carry the same green edge Codeforces gives them. */
     borderLeft: `5px solid ${statusFill}`,
     borderTop: index > 0 ? `1px solid ${look.line}` : undefined,
     background: index % 2 === 0 ? look.zebra : 'transparent',
@@ -852,12 +852,18 @@ function ProblemRow({
         </button>
       </span>
 
-      {/* Status: a solved row's cell is filled green, like Codeforces' solved marker; amber when it was solved only after the contest */}
+      {/* Status: a solved row's cell is filled green, like Codeforces' solved marker; "Upsolved" is a problem tried in the contest and solved after it */}
       <span
         title={
           status === 'unsolved'
             ? 'Not yet solved'
-            : `${status === 'contest' ? 'Solved during the contest' : 'Solved after the contest (upsolved)'}${problem.acIds.length ? '' : " (but that accepted submission isn't included in the dates or contest type you're currently viewing)"}`
+            : `${
+                status === 'upsolved'
+                  ? "Not solved during the contest, solved afterwards (upsolved)"
+                  : problem.solvedInContest
+                    ? 'Solved during the contest'
+                    : 'Solved in practice (not attempted during the contest)'
+              }${problem.acIds.length ? '' : " (but that accepted submission isn't included in the dates or contest type you're currently viewing)"}`
         }
         style={{
           alignSelf: 'stretch',
@@ -871,7 +877,7 @@ function ProblemRow({
           background: statusFill,
         }}
       >
-        {status === 'contest' ? 'Solved' : status === 'after' ? 'Upsolved' : 'Unsolved'}
+        {status === 'upsolved' ? 'Upsolved' : status === 'solved' ? 'Solved' : 'Unsolved'}
       </span>
     </div>
   );

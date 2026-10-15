@@ -242,25 +242,33 @@ export class PerformanceEngine {
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[categoryKey][index].push(timeMin);
     });
 
+    /* Whether a submission was made while its contest was running (by its time). */
+    const madeDuringContest = (submission: CodeforcesSubmission): boolean => {
+      const contestId = submission.problem?.contestId;
+      if (typeof contestId !== 'number') return false;
+      const contest = this.contestMap[contestId];
+      const submittedAt = submission.creationTimeSeconds;
+      return (
+        !!contest &&
+        typeof contest.startTimeSeconds === 'number' &&
+        typeof contest.durationSeconds === 'number' &&
+        typeof submittedAt === 'number' &&
+        submittedAt >= contest.startTimeSeconds &&
+        submittedAt <= contest.startTimeSeconds + contest.durationSeconds
+      );
+    };
+
     const everAC = new Set<string>();
     const acInContest = new Set<string>();
+    const attemptedInContest = new Set<string>();
     this.rawSubmissions.forEach(submission => {
-      if (submission.verdict === 'OK' && submission.problem && typeof submission.problem.contestId === 'number') {
-        const pid = `${submission.problem.contestId}-${submission.problem.index}`;
+      if (!submission.problem || typeof submission.problem.contestId !== 'number') return;
+      const pid = `${submission.problem.contestId}-${submission.problem.index}`;
+      const during = madeDuringContest(submission);
+      if (during) attemptedInContest.add(pid);
+      if (submission.verdict === 'OK') {
         everAC.add(pid);
-
-        const contest = this.contestMap[submission.problem.contestId];
-        const submittedAt = submission.creationTimeSeconds;
-        if (
-          contest &&
-          typeof contest.startTimeSeconds === 'number' &&
-          typeof contest.durationSeconds === 'number' &&
-          typeof submittedAt === 'number' &&
-          submittedAt >= contest.startTimeSeconds &&
-          submittedAt <= contest.startTimeSeconds + contest.durationSeconds
-        ) {
-          acInContest.add(pid);
-        }
+        if (during) acInContest.add(pid);
       }
     });
 
@@ -290,6 +298,7 @@ export class PerformanceEngine {
       tags: (submission.problem.tags || []).slice(),
       solved: everAC.has(`${submission.problem.contestId}-${submission.problem.index}`),
       solvedInContest: acInContest.has(`${submission.problem.contestId}-${submission.problem.index}`),
+      attemptedInContest: attemptedInContest.has(`${submission.problem.contestId}-${submission.problem.index}`),
       wa: 0, tle: 0, rte: 0, mle: 0, other: 0,
       acIds: [], waIds: [], tleIds: [], rteIds: [], mleIds: [], otherIds: [],
     });
@@ -301,6 +310,7 @@ export class PerformanceEngine {
       problem[`${key}Ids` as 'waIds' | 'tleIds' | 'rteIds' | 'mleIds' | 'otherIds'].push(submissionId);
     };
 
+    const recordedIds = new Set<number>();
     filteredSubmissions.forEach(submission => {
       if (!submission.problem || typeof submission.problem.contestId !== 'number') return;
       const contestId = submission.problem.contestId;
@@ -320,39 +330,42 @@ export class PerformanceEngine {
       const problem = categoryRawWAMap[categoryKey].get(pid) as ProblemEntry;
       submissionTimingMap.set(submission.id, { contestStart: start, submittedAt });
       submissionContestMap.set(submission.id, contestId);
+      recordedIds.add(submission.id);
       if (submission.verdict === 'OK') problem.acIds.push(submission.id);
       else recordVerdict(problem, submission.verdict, submission.id);
     });
 
-    const inContestAcIds = new Set<number>();
-    CATEGORIES.forEach(category => categoryRawWAMap[category].forEach(problem => problem.acIds.forEach(id => inContestAcIds.add(id))));
+    /*
+     * A problem touched during its contest, right or wrong, is listed here
+     * with all of its submissions: the ones above are those made during the
+     * contest, and this adds every other one the user made on it (after the
+     * contest, accepted or not), whatever period is shown.
+     */
     this.rawSubmissions.forEach(submission => {
-      if (!submission.problem || submission.verdict !== 'OK' || typeof submission.problem.contestId !== 'number') return;
+      if (!submission.problem || typeof submission.problem.contestId !== 'number') return;
+      if (recordedIds.has(submission.id)) return;
       const contestId = submission.problem.contestId;
       const pid = `${contestId}-${submission.problem.index}`;
-      if (inContestAcIds.has(submission.id)) return;
+      const entry = CATEGORIES.map(category => categoryRawWAMap[category].get(pid)).find(found => found !== undefined);
+      if (!entry) return;
       const contest = this.contestMap[contestId];
-      if (contest && typeof contest.startTimeSeconds === 'number' && typeof contest.durationSeconds === 'number') {
-        const start = contest.startTimeSeconds;
-        const end = start + contest.durationSeconds;
-        const submittedAt = submission.creationTimeSeconds;
-        if (typeof submittedAt === 'number' && submittedAt >= start && submittedAt <= end) {
-          submissionTimingMap.set(submission.id, { contestStart: start, submittedAt });
-          submissionContestMap.set(submission.id, contestId);
-        }
+      if (contest && madeDuringContest(submission)) {
+        submissionTimingMap.set(submission.id, { contestStart: contest.startTimeSeconds, submittedAt: submission.creationTimeSeconds });
+        submissionContestMap.set(submission.id, contestId);
       }
-      CATEGORIES.some(category => {
-        const entry = categoryRawWAMap[category].get(pid);
-        if (!entry) return false;
-        entry.acIds.push(submission.id);
-        return true;
-      });
+      recordedIds.add(submission.id);
+      if (submission.verdict === 'OK') entry.acIds.push(submission.id);
+      else recordVerdict(entry, submission.verdict, submission.id);
     });
 
     const categoryRawProblems = {} as ModeData['categoryRawProblems'];
     CATEGORIES.forEach(category => {
       categoryRawProblems[category] = Array.from(categoryRawWAMap[category].values());
     });
+
+    /* Practice holds only problems never touched during their contest: those are listed above. */
+    const inContestPids = new Set<string>();
+    CATEGORIES.forEach(category => categoryRawWAMap[category].forEach((_, pid) => inContestPids.add(pid)));
 
     const practiceRawWAMap = new Map<string, ProblemEntry>();
     filteredSubmissions.forEach(submission => {
@@ -369,6 +382,7 @@ export class PerformanceEngine {
       }
       if (duringContest) return;
       const pid = `${contestId}-${submission.problem.index}`;
+      if (inContestPids.has(pid)) return;
       if (!practiceRawWAMap.has(pid)) practiceRawWAMap.set(pid, makeProbEntry(submission, contest.name || `Contest ${contestId}`));
       const problem = practiceRawWAMap.get(pid) as ProblemEntry;
       if (submission.verdict === 'OK') problem.acIds.push(submission.id);
