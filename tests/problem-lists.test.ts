@@ -317,3 +317,136 @@ test('the list source is not filled from the contest data', () => {
   assert.equal(getFrictionProblems(empty, 'Div2', 'practice').length, 1);
   assert.equal(getFrictionProblems(empty, 'Div2', 'category').length, 1);
 });
+
+/* ---------- reading a list from a web address ---------- */
+
+import {
+  extractProblemLinks,
+  listNameFromUrl,
+  noProblemsAtUrlMessage,
+  normalizeListUrl,
+  urlFailureMessage,
+  validateListUrl,
+} from '../src/domain/problemLists.ts';
+import { fetchListText } from '../src/services/problemListFetch.ts';
+
+test('address: only a public https address is accepted', () => {
+  const bad = [
+    '',
+    '   ',
+    'not a url',
+    'http://example.com/list.txt',
+    'ftp://example.com/list.txt',
+    'javascript:alert(1)',
+    'file:///etc/passwd',
+    'https://user:pass@example.com/list.txt',
+    'https://localhost/list.txt',
+    'https://intranet/list.txt',
+    'https://127.0.0.1/list.txt',
+    'https://192.168.1.5/list.txt',
+    'https://[::1]/list.txt',
+    'https://printer.local/list.txt',
+  ];
+
+  for (const input of bad) {
+    assert.equal(validateListUrl(input).ok, false, input);
+  }
+
+  const good = validateListUrl('  https://raw.githubusercontent.com/u/r/main/list.txt  ');
+
+  assert.equal(good.ok, true);
+  assert.equal(good.ok && good.url.hostname, 'raw.githubusercontent.com');
+});
+
+test('address: a github.com file page becomes the raw file address, anything else is untouched', () => {
+  assert.equal(
+    normalizeListUrl(new URL('https://github.com/user/repo/blob/main/lists/cp31.txt')).href,
+    'https://raw.githubusercontent.com/user/repo/main/lists/cp31.txt',
+  );
+  assert.equal(normalizeListUrl(new URL('https://github.com/user/repo')).href, 'https://github.com/user/repo');
+  assert.equal(normalizeListUrl(new URL('https://example.com/a/blob/b/c')).href, 'https://example.com/a/blob/b/c');
+});
+
+test('address: the list is named after the file in the address, else the site', () => {
+  assert.equal(listNameFromUrl(new URL('https://example.com/a/My%20List.csv?x=1')), 'My List');
+  assert.equal(listNameFromUrl(new URL('https://example.com/')), 'example.com');
+  assert.equal(listNameFromUrl(new URL('https://example.com/%E0%A4%A.txt')).length > 0, true);
+});
+
+test('page: every problem link is found, even many on one line', () => {
+  const html =
+    '<html><body><a href="/problemset/problem/4/A">A</a><a href="https://codeforces.com/contest/1/problem/B2">B</a>' +
+    '<a href="https://codeforces.com/contest/1/submission/55">s</a><a href="/problemset/problem/4/A">again</a></body></html>';
+
+  assert.deepEqual(extractProblemLinks(html).pids, ['4-A', '1-B2']);
+  assert.deepEqual(extractProblemLinks('nothing here').pids, []);
+});
+
+test('address: failure messages name the site and point to the file import', () => {
+  assert.match(urlFailureMessage('blocked', 'example.com'), /^example\.com does not allow .*Import file/);
+  assert.match(urlFailureMessage('http', 'example.com', 404), /\(404\).*Import file/);
+  assert.match(urlFailureMessage('too-large', 'example.com'), /512 KB/);
+  assert.match(urlFailureMessage('timeout', 'example.com'), /took too long/);
+  assert.match(noProblemsAtUrlMessage(true), /JavaScript.*Import file/);
+  assert.doesNotMatch(noProblemsAtUrlMessage(false), /JavaScript/);
+});
+
+test('fetch: a readable list comes back as text, sent without cookies or referrer', async () => {
+  let seen: RequestInit | undefined;
+  const result = await fetchListText('https://example.com/l.txt', {
+    fetcher: async (_url, init) => {
+      seen = init;
+      return new Response('1A\n2B\n', { headers: { 'content-type': 'text/plain' } });
+    },
+  });
+
+  assert.deepEqual(result, { ok: true, text: '1A\n2B\n', contentType: 'text/plain' });
+  assert.equal(seen?.credentials, 'omit');
+  assert.equal(seen?.referrerPolicy, 'no-referrer');
+});
+
+test('fetch: an error status, a blocked or unreachable site, and a slow site are told apart', async () => {
+  assert.deepEqual(
+    await fetchListText('https://example.com/x', { fetcher: async () => new Response('nope', { status: 404 }) }),
+    { ok: false, failure: 'http', status: 404 },
+  );
+
+  assert.deepEqual(
+    await fetchListText('https://example.com/x', {
+      fetcher: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+    }),
+    { ok: false, failure: 'blocked' },
+  );
+
+  const slow = await fetchListText('https://example.com/x', {
+    timeoutMs: 20,
+    fetcher: (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      }),
+  });
+
+  assert.deepEqual(slow, { ok: false, failure: 'timeout' });
+});
+
+test('fetch: a list over the size limit is refused, whether declared or only found while reading', async () => {
+  assert.deepEqual(
+    await fetchListText('https://example.com/x', {
+      maxBytes: 10,
+      fetcher: async () => new Response('x', { headers: { 'content-length': '11' } }),
+    }),
+    { ok: false, failure: 'too-large' },
+  );
+
+  assert.deepEqual(
+    await fetchListText('https://example.com/x', {
+      maxBytes: 10,
+      fetcher: async () => new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(6)); controller.enqueue(new Uint8Array(6)); controller.close(); } })),
+    }),
+    { ok: false, failure: 'too-large' },
+  );
+
+  assert.equal((await fetchListText('https://example.com/x', { maxBytes: 10, fetcher: async () => new Response('1234567890') })).ok, true);
+});

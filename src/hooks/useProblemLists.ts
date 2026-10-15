@@ -5,11 +5,18 @@ import {
   MAX_FILE_BYTES,
   MAX_LISTS,
   MAX_PROBLEMS_PER_LIST,
+  extractProblemLinks,
   listNameFromFile,
+  listNameFromUrl,
+  noProblemsAtUrlMessage,
+  normalizeListUrl,
   parseProblemListText,
+  urlFailureMessage,
+  validateListUrl,
 } from '../domain/problemLists';
-import type { StoredProblemList } from '../domain/problemLists';
+import type { ParsedProblemList, StoredProblemList } from '../domain/problemLists';
 import { fetchProblemMetadata } from '../services/codeforcesApi';
+import { fetchListText } from '../services/problemListFetch';
 import {
   defaultListStorage,
   loadProblemLists,
@@ -30,6 +37,10 @@ export interface ProblemListsApi {
   /* Names and ratings of the active list are being looked up. */
   loadingNames: boolean;
   importFile: (file: File) => Promise<void>;
+  /* Reads a list from a web address; true when a list was added. */
+  importUrl: (address: string) => Promise<boolean>;
+  /* An address is being read. */
+  importing: boolean;
   remove: (id: string) => void;
 }
 
@@ -50,9 +61,11 @@ export function useProblemLists(engine: PerformanceEngine): ProblemListsApi {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loadingNames, setLoadingNames] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const listsRef = useRef(lists);
   const pendingRef = useRef(new Set<string>());
+  const importingRef = useRef(false);
   const failedAtRef = useRef(Number.NEGATIVE_INFINITY);
 
   const active = lists.find(list => list.id === activeId) ?? lists[0] ?? null;
@@ -68,6 +81,48 @@ export function useProblemLists(engine: PerformanceEngine): ProblemListsApi {
 
     return true;
   }, []);
+
+  /* Stores a parsed list and tells the user what came of it; false when nothing was added. */
+  const addList = useCallback(
+    (name: string, parsed: ParsedProblemList): boolean => {
+      /* A file or an address is read asynchronously: the lists may have changed meanwhile. */
+      if (listsRef.current.length >= MAX_LISTS) {
+        setNotice(`You can keep up to ${MAX_LISTS} lists. Remove one first.`);
+
+        return false;
+      }
+
+      const list: StoredProblemList = {
+        id: newId(listsRef.current),
+        name,
+        pids: parsed.pids,
+        meta: {},
+      };
+
+      if (!commit([...listsRef.current, list])) {
+        setNotice('The list could not be saved: browser storage is full or blocked.');
+
+        return false;
+      }
+
+      setActiveId(list.id);
+
+      const parts = [`Imported ${parsed.pids.length} problem${parsed.pids.length === 1 ? '' : 's'}`];
+
+      if (parsed.ignored > 0) {
+        parts.push(`${parsed.ignored} line${parsed.ignored === 1 ? '' : 's'} had no problem`);
+      }
+
+      if (parsed.truncated) {
+        parts.push(`only the first ${MAX_PROBLEMS_PER_LIST} were kept`);
+      }
+
+      setNotice(`${parts.join('; ')}.`);
+
+      return true;
+    },
+    [commit],
+  );
 
   const importFile = useCallback(
     async (file: File): Promise<void> => {
@@ -101,41 +156,61 @@ export function useProblemLists(engine: PerformanceEngine): ProblemListsApi {
         return;
       }
 
-      /* The file was read asynchronously: the lists may have changed meanwhile. */
+      addList(listNameFromFile(file.name), parsed);
+    },
+    [addList],
+  );
+
+  const importUrl = useCallback(
+    async (address: string): Promise<boolean> => {
+      if (importingRef.current) {
+        return false;
+      }
+
+      const checked = validateListUrl(address);
+
+      if (!checked.ok) {
+        setNotice(checked.message);
+
+        return false;
+      }
+
       if (listsRef.current.length >= MAX_LISTS) {
         setNotice(`You can keep up to ${MAX_LISTS} lists. Remove one first.`);
 
-        return;
+        return false;
       }
 
-      const list: StoredProblemList = {
-        id: newId(listsRef.current),
-        name: listNameFromFile(file.name),
-        pids: parsed.pids,
-        meta: {},
-      };
+      importingRef.current = true;
+      setImporting(true);
+      setNotice(null);
 
-      if (!commit([...listsRef.current, list])) {
-        setNotice('The list could not be saved: browser storage is full or blocked.');
+      try {
+        const url = normalizeListUrl(checked.url);
+        const result = await fetchListText(url.href);
 
-        return;
+        if (!result.ok) {
+          setNotice(urlFailureMessage(result.failure, url.hostname, result.status));
+
+          return false;
+        }
+
+        const isPage = /html/i.test(result.contentType) || /^\s*<(!doctype|html)/i.test(result.text);
+        const parsed = isPage ? extractProblemLinks(result.text) : parseProblemListText(result.text);
+
+        if (parsed.pids.length === 0) {
+          setNotice(noProblemsAtUrlMessage(isPage));
+
+          return false;
+        }
+
+        return addList(listNameFromUrl(url), parsed);
+      } finally {
+        importingRef.current = false;
+        setImporting(false);
       }
-
-      setActiveId(list.id);
-
-      const parts = [`Imported ${parsed.pids.length} problem${parsed.pids.length === 1 ? '' : 's'}`];
-
-      if (parsed.ignored > 0) {
-        parts.push(`${parsed.ignored} line${parsed.ignored === 1 ? '' : 's'} had no problem`);
-      }
-
-      if (parsed.truncated) {
-        parts.push(`only the first ${MAX_PROBLEMS_PER_LIST} were kept`);
-      }
-
-      setNotice(`${parts.join('; ')}.`);
     },
-    [commit],
+    [addList],
   );
 
   const remove = useCallback(
@@ -206,5 +281,5 @@ export function useProblemLists(engine: PerformanceEngine): ProblemListsApi {
     [engine, active],
   );
 
-  return { lists, active, setActiveId, entries, notice, loadingNames, importFile, remove };
+  return { lists, active, setActiveId, entries, notice, loadingNames, importFile, importUrl, importing, remove };
 }

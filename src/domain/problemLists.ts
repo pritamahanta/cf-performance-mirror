@@ -197,6 +197,125 @@ export function parseProblemListText(text: string): ParsedProblemList {
   };
 }
 
+/*
+ * Every problem link in a web page (or any text), in the order they appear,
+ * duplicates dropped. For pages, where links sit inside markup and a line
+ * holds many of them, unlike a list file with one problem per line.
+ */
+export function extractProblemLinks(text: string): ParsedProblemList {
+  const found: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of text.matchAll(new RegExp(URL_PATTERN.source, 'gi'))) {
+    const pid = makePid(match[1], match[2]);
+
+    if (pid && !seen.has(pid)) {
+      seen.add(pid);
+      found.push(pid);
+    }
+  }
+
+  return {
+    pids: found.slice(0, MAX_PROBLEMS_PER_LIST),
+    ignored: 0,
+    truncated: found.length > MAX_PROBLEMS_PER_LIST,
+  };
+}
+
+export type ListUrlCheck = { ok: true; url: URL } | { ok: false; message: string };
+
+/* Only a public https address is fetched: no other scheme, no login in the address, no local or numeric host. */
+export function validateListUrl(input: string): ListUrlCheck {
+  const raw = input.trim();
+
+  if (raw === '') {
+    return { ok: false, message: 'Enter the address of a list.' };
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, message: 'That is not a valid address.' };
+  }
+
+  if (url.protocol !== 'https:') {
+    return { ok: false, message: 'Only https:// addresses are supported.' };
+  }
+
+  if (url.username !== '' || url.password !== '') {
+    return { ok: false, message: 'Addresses with a user name or password are not supported.' };
+  }
+
+  const host = url.hostname.toLowerCase();
+
+  if (
+    !host.includes('.') ||
+    host.includes(':') ||
+    /^[\d.]+$/.test(host) ||
+    /\.(local|localhost|internal|lan|home|corp)$/.test(host)
+  ) {
+    return { ok: false, message: 'That address is not a public website.' };
+  }
+
+  return { ok: true, url };
+}
+
+/*
+ * A github.com file page (".../blob/<branch>/<path>") is a web page that
+ * does not allow other sites to read it; the same file's raw address does.
+ */
+export function normalizeListUrl(url: URL): URL {
+  if (url.hostname.toLowerCase() === 'github.com') {
+    const match = /^\/([^/]+)\/([^/]+)\/blob\/(.+)$/.exec(url.pathname);
+
+    if (match) {
+      return new URL(`https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`);
+    }
+  }
+
+  return url;
+}
+
+/* The last part of the address without its extension, else the site's name. */
+export function listNameFromUrl(url: URL): string {
+  const last = url.pathname.split('/').filter(Boolean).pop() ?? '';
+  let decoded = last;
+
+  try {
+    decoded = decodeURIComponent(last);
+  } catch {
+    /* Keep the undecoded text. */
+  }
+
+  const name = listNameFromFile(decoded);
+
+  return name === 'Imported list' || decoded === '' ? url.hostname.slice(0, MAX_LIST_NAME_LENGTH) : name;
+}
+
+export type ListFetchFailure = 'blocked' | 'http' | 'too-large' | 'timeout';
+
+/* What to tell the user when a list address could not be read. */
+export function urlFailureMessage(failure: ListFetchFailure, host: string, status?: number): string {
+  switch (failure) {
+    case 'blocked':
+      return `${host} does not allow this extension to read it, or could not be reached. Download the list and use "Import file" instead.`;
+    case 'http':
+      return `${host} answered with an error (${status ?? 'unknown'}). Check the address, or download the list and use "Import file".`;
+    case 'too-large':
+      return `That list is too large (the limit is ${MAX_FILE_BYTES / 1024} KB).`;
+    default:
+      return `${host} took too long to answer.`;
+  }
+}
+
+export function noProblemsAtUrlMessage(isPage: boolean): string {
+  return isPage
+    ? 'No Codeforces problem links were found on that page. If the page builds its list with JavaScript, download the list and use "Import file".'
+    : 'No Codeforces problems were found at that address.';
+}
+
 /* The file's name without its extension, as the list's name. */
 export function listNameFromFile(fileName: string): string {
   const base = fileName.replace(/\.[^./\\]*$/, '').replace(/[\r\n\t]+/g, ' ').trim();

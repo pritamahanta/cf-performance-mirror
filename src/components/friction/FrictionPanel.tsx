@@ -49,6 +49,8 @@ export function FrictionPanel({ engine, modeData, category, settings, theme, onS
   const solvedCounts = useProblemSolvedCounts();
   const problemLists = useProblemLists(engine);
   const listFileInput = useRef<HTMLInputElement>(null);
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [urlValue, setUrlValue] = useState('');
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -295,9 +297,19 @@ export function FrictionPanel({ engine, modeData, category, settings, theme, onS
               type="button"
               title="Import a .txt, .csv or .json file of Codeforces problem links or ids"
               style={listControlStyle(theme)}
+              disabled={problemLists.importing}
               onClick={() => listFileInput.current?.click()}
             >
               Import file
+            </button>
+            <button
+              type="button"
+              title="Read a list from a web address, if the site allows it"
+              style={listControlStyle(theme)}
+              disabled={problemLists.importing}
+              onClick={() => setUrlOpen(open => !open)}
+            >
+              Import URL
             </button>
             <input
               ref={listFileInput}
@@ -326,6 +338,50 @@ export function FrictionPanel({ engine, modeData, category, settings, theme, onS
               >
                 Remove
               </button>
+            )}
+            {urlOpen && (
+              <form
+                noValidate
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}
+                onSubmit={event => {
+                  event.preventDefault();
+                  setPopup(null);
+                  void problemLists.importUrl(urlValue).then(added => {
+                    if (added) {
+                      setUrlValue('');
+                      setUrlOpen(false);
+                    }
+                  });
+                }}
+              >
+                <input
+                  type="text"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus
+                  aria-label="Web address of a problem list"
+                  placeholder="https://raw.githubusercontent.com/user/repo/main/list.txt"
+                  value={urlValue}
+                  disabled={problemLists.importing}
+                  onChange={event => setUrlValue(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape') setUrlOpen(false);
+                  }}
+                  style={{ ...listControlStyle(theme), flex: '1 1 260px', minWidth: 0, fontWeight: 400, cursor: 'text' }}
+                />
+                <button type="submit" style={listControlStyle(theme)} disabled={problemLists.importing || urlValue.trim() === ''}>
+                  {problemLists.importing ? 'Importing…' : 'Add'}
+                </button>
+                <button
+                  type="button"
+                  style={listControlStyle(theme)}
+                  disabled={problemLists.importing}
+                  onClick={() => setUrlOpen(false)}
+                >
+                  Cancel
+                </button>
+              </form>
             )}
             {problemLists.loadingNames && <span style={{ color: theme.muted }}>Loading names and ratings…</span>}
             {problemLists.notice && <span role="status" style={{ color: theme.muted }}>{problemLists.notice}</span>}
