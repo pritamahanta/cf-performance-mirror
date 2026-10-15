@@ -27,6 +27,95 @@ export class PerformanceEngine {
     this.userRatingHistory = input.userRatingHistory;
   }
 
+  /* Whether a submission was made while its contest was running (by its time). */
+  private madeDuringContest(submission: CodeforcesSubmission): boolean {
+    const contestId = submission.problem?.contestId;
+    if (typeof contestId !== 'number') return false;
+    const contest = this.contestMap[contestId];
+    const submittedAt = submission.creationTimeSeconds;
+    return (
+      !!contest &&
+      typeof contest.startTimeSeconds === 'number' &&
+      typeof contest.durationSeconds === 'number' &&
+      typeof submittedAt === 'number' &&
+      submittedAt >= contest.startTimeSeconds &&
+      submittedAt <= contest.startTimeSeconds + contest.durationSeconds
+    );
+  }
+
+  /*
+   * One entry per wanted problem ("<contestId>-<index>", in the order given),
+   * built from every submission the user ever made on it, whatever period or
+   * contest type is shown. A problem the user never submitted still gets an
+   * entry (nothing solved, no submissions), named from `fallback` when the
+   * caller knows it. A problem the user did submit takes its name, rating
+   * and tags from the submission itself.
+   */
+  entriesForPids(
+    pids: readonly string[],
+    fallback: (pid: string) => { name: string; rating: number | null; tags: string[] } | undefined,
+  ): ProblemEntry[] {
+    const wanted = new Set(pids);
+    const byPid = new Map<string, CodeforcesSubmission[]>();
+
+    this.rawSubmissions.forEach(submission => {
+      if (!submission.problem || typeof submission.problem.contestId !== 'number') return;
+      const pid = `${submission.problem.contestId}-${submission.problem.index}`;
+      if (!wanted.has(pid)) return;
+      const list = byPid.get(pid);
+      if (list) list.push(submission);
+      else byPid.set(pid, [submission]);
+    });
+
+    return pids.map(pid => {
+      const separator = pid.indexOf('-');
+      const contestId = Number.parseInt(pid.slice(0, separator), 10);
+      const index = pid.slice(separator + 1);
+      const submissions = byPid.get(pid) ?? [];
+      const known = fallback(pid);
+      const first = submissions.find(submission => submission.problem.name) ?? submissions[0];
+      const contest = this.contestMap[contestId];
+
+      const entry: ProblemEntry = {
+        pid,
+        name: first?.problem.name || known?.name || pid,
+        contestId,
+        contestName: contest?.name || `Contest ${contestId}`,
+        index,
+        rating: first?.problem.rating || known?.rating || null,
+        tags: (first?.problem.tags?.length ? first.problem.tags : known?.tags || []).slice(),
+        solved: false,
+        solvedInContest: false,
+        attemptedInContest: false,
+        wa: 0, tle: 0, rte: 0, mle: 0, other: 0,
+        acIds: [], waIds: [], tleIds: [], rteIds: [], mleIds: [], otherIds: [],
+      };
+
+      submissions.forEach(submission => {
+        const during = this.madeDuringContest(submission);
+        if (during) entry.attemptedInContest = true;
+
+        if (submission.verdict === 'OK') {
+          entry.solved = true;
+          if (during) entry.solvedInContest = true;
+          entry.acIds.push(submission.id);
+          return;
+        }
+
+        const key =
+          submission.verdict === 'WRONG_ANSWER' ? 'wa'
+          : submission.verdict === 'TIME_LIMIT_EXCEEDED' ? 'tle'
+          : submission.verdict === 'RUNTIME_ERROR' ? 'rte'
+          : submission.verdict === 'MEMORY_LIMIT_EXCEEDED' ? 'mle'
+          : 'other';
+        entry[key] += 1;
+        entry[`${key}Ids` as 'waIds' | 'tleIds' | 'rteIds' | 'mleIds' | 'otherIds'].push(submission.id);
+      });
+
+      return entry;
+    });
+  }
+
   calcDeltaRating(category: Category, timelineValue: ResolvedTimeline, now = Math.floor(Date.now() / 1000)): DeltaInfo {
     let cutoffTime = 0;
     let endTime = now;
@@ -242,21 +331,7 @@ export class PerformanceEngine {
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[categoryKey][index].push(timeMin);
     });
 
-    /* Whether a submission was made while its contest was running (by its time). */
-    const madeDuringContest = (submission: CodeforcesSubmission): boolean => {
-      const contestId = submission.problem?.contestId;
-      if (typeof contestId !== 'number') return false;
-      const contest = this.contestMap[contestId];
-      const submittedAt = submission.creationTimeSeconds;
-      return (
-        !!contest &&
-        typeof contest.startTimeSeconds === 'number' &&
-        typeof contest.durationSeconds === 'number' &&
-        typeof submittedAt === 'number' &&
-        submittedAt >= contest.startTimeSeconds &&
-        submittedAt <= contest.startTimeSeconds + contest.durationSeconds
-      );
-    };
+    const madeDuringContest = (submission: CodeforcesSubmission): boolean => this.madeDuringContest(submission);
 
     const everAC = new Set<string>();
     const acInContest = new Set<string>();

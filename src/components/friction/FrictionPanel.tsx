@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, CSSProperties, ReactNode } from 'react';
 import type { Category, ExtensionSettings } from '../../types/settings';
 import type { ModeData, ProblemEntry } from '../../types/performance';
+import type { PerformanceEngine } from '../../domain/performanceEngine';
 import type { Theme } from '../../domain/theme';
 import { totalErrors } from '../../domain/utils';
 import {
@@ -17,10 +18,12 @@ import {
   type SubmissionVerdictKey,
 } from '../../domain/friction';
 import { OMITTED_PROBLEMS_HINT, omittedProblemsNote } from '../../domain/panelNotices';
+import { useProblemLists } from '../../hooks/useProblemLists';
 import { useProblemSolvedCounts } from '../../hooks/useProblemSolvedCounts';
 import { SubmissionPopup, type SubmissionVerdicts as PopupVerdicts } from './SubmissionPopup';
 
 interface Props {
+  engine: PerformanceEngine;
   modeData: ModeData;
   category: Category;
   settings: ExtensionSettings;
@@ -33,7 +36,7 @@ interface Props {
 /* Height of the problem list: taller on a tall screen, never more than about two thirds of the window. */
 const LIST_HEIGHT = 'min(560px, 64vh)';
 
-export function FrictionPanel({ modeData, category, settings, theme, onSettingsChange, popupSort, onPopupSortChange }: Props) {
+export function FrictionPanel({ engine, modeData, category, settings, theme, onSettingsChange, popupSort, onPopupSortChange }: Props) {
   const [source, setSource] = useState<FrictionSource>('category');
   const [sort, setSort] = useState<'errors' | 'rating'>(settings.sortMode);
   const [openMenu, setOpenMenu] = useState<'filter' | 'sort' | 'view' | null>(null);
@@ -44,6 +47,8 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
     problemIndex: string; problemName: string; problemContestName?: string;
   } | null>(null);
   const solvedCounts = useProblemSolvedCounts();
+  const problemLists = useProblemLists(engine);
+  const listFileInput = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -88,7 +93,9 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
     };
   }, [overflowOpen]);
 
-  const getProblems = (which: FrictionSource) => getFrictionProblems(modeData, category, which);
+  const getProblems = (which: FrictionSource) => which === 'list'
+    ? problemLists.entries
+    : getFrictionProblems(modeData, category, which);
   const filters: FrictionFilters = {
     hideAC: settings.hideAC,
     solvedOnly: settings.solvedOnly,
@@ -100,14 +107,15 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
     tagFilters: settings.tagFilters,
   };
 
-  const problems = useMemo(() => getProblems(source), [modeData, category, source]);
+  const problems = useMemo(() => getProblems(source), [modeData, category, source, problemLists.entries]);
   const filtered = useMemo(() => filterFrictionProblems(problems, filters), [problems, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minWrongAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
   const sorted = useMemo(() => sortFrictionProblems(filtered, sort), [filtered, sort]);
   const availableTags = useMemo(() => getAvailableTags(problems), [problems]);
   const sourceCounts = useMemo(() => ({
     category: filterFrictionProblems(getProblems('category'), filters).length,
     practice: filterFrictionProblems(getProblems('practice'), filters).length,
-  }), [modeData, category, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minWrongAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
+    list: filterFrictionProblems(getProblems('list'), filters).length,
+  }), [modeData, category, problemLists.entries, settings.hideAC, settings.solvedOnly, settings.hideTags, settings.hideRatings, settings.minWrongAttempts, settings.ratingMin, settings.ratingMax, settings.tagFilters]);
 
   const visibleTags = useMemo(() => {
     const combined = Array.from(new Set([...ALL_CF_TAGS, ...availableTags, ...settings.tagFilters])).sort();
@@ -168,7 +176,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
             display: 'flex', alignItems: 'center', background: theme.borderLighter,
             borderRadius: 5, padding: 3, gap: 2, flexShrink: 0,
           }}>
-            {(['category', 'practice'] as const).map(key => {
+            {(['category', 'practice', 'list'] as const).map(key => {
               const active = source === key;
               return (
                 <button
@@ -183,7 +191,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
                   }}
                   onClick={() => { setSource(key); setPopup(null); }}
                 >
-                  {key === 'category' ? 'In-contest' : 'Practice'}
+                  {key === 'category' ? 'In-contest' : key === 'practice' ? 'Practice' : 'Lists'}
                   <span style={{
                     fontSize: 10, fontWeight: 700, borderRadius: 9, padding: '0 5px',
                     minWidth: 16, textAlign: 'center', display: 'inline-block',
@@ -264,6 +272,65 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
             </div>
           </div>
         </div>
+        {source === 'list' && (
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0,
+              padding: '6px 12px', borderBottom: `1px solid ${theme.borderLighter}`, fontSize: 11,
+            }}
+          >
+            {problemLists.lists.length > 0 && (
+              <select
+                aria-label="Problem list"
+                value={problemLists.active?.id ?? ''}
+                onChange={event => { problemLists.setActiveId(event.target.value); setPopup(null); }}
+                style={{ ...listControlStyle(theme), maxWidth: 260 }}
+              >
+                {problemLists.lists.map(list => (
+                  <option key={list.id} value={list.id}>{`${list.name} (${list.pids.length})`}</option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              title="Import a .txt, .csv or .json file of Codeforces problem links or ids"
+              style={listControlStyle(theme)}
+              onClick={() => listFileInput.current?.click()}
+            >
+              Import file
+            </button>
+            <input
+              ref={listFileInput}
+              type="file"
+              accept=".txt,.csv,.tsv,.json,text/plain,text/csv,application/json"
+              style={{ display: 'none' }}
+              onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                setPopup(null);
+                if (file) void problemLists.importFile(file);
+              }}
+            />
+            {problemLists.active && (
+              <button
+                type="button"
+                title="Remove this list (your Codeforces submissions are not affected)"
+                style={listControlStyle(theme)}
+                onClick={() => {
+                  const list = problemLists.active;
+                  if (list && window.confirm(`Remove the list "${list.name}"?`)) {
+                    setPopup(null);
+                    problemLists.remove(list.id);
+                  }
+                }}
+              >
+                Remove
+              </button>
+            )}
+            {problemLists.loadingNames && <span style={{ color: theme.muted }}>Loading names and ratings…</span>}
+            {problemLists.notice && <span role="status" style={{ color: theme.muted }}>{problemLists.notice}</span>}
+          </div>
+        )}
         {settings.tagFilters.length > 0 && (
           <div style={{
             display: 'flex', alignItems: 'center', padding: '5px 12px',
@@ -293,9 +360,11 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
         }}>
           {!sorted.length ? (
             <div style={{ padding: '24px 14px', color: theme.emptyText, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>
-              {settings.tagFilters.length || settings.ratingMin || settings.ratingMax || settings.solvedOnly || settings.hideAC || settings.minWrongAttempts > 0
-                ? 'No problems match the selected filters.'
-                : 'No problems found.'}
+              {source === 'list' && problemLists.lists.length === 0
+                ? 'No lists yet. Use "Import file" to add a .txt, .csv or .json file with Codeforces problem links or ids (for example 4A, 1-B or https://codeforces.com/problemset/problem/4/A), one per line.'
+                : settings.tagFilters.length || settings.ratingMin || settings.ratingMax || settings.solvedOnly || settings.hideAC || settings.minWrongAttempts > 0
+                  ? 'No problems match the selected filters.'
+                  : 'No problems found.'}
             </div>
           ) : (
             <>
@@ -317,7 +386,7 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
           )}
         </div>
 
-        {omittedNote && (
+        {omittedNote && source !== 'list' && (
           <div
             title={OMITTED_PROBLEMS_HINT}
             style={{
@@ -353,6 +422,13 @@ export function FrictionPanel({ modeData, category, settings, theme, onSettingsC
       </div>
     </div>
   );
+}
+
+function listControlStyle(theme: Theme): CSSProperties {
+  return {
+    height: 26, padding: '0 10px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+    border: `1px solid ${theme.borderLight}`, background: theme.bg, color: theme.text,
+  };
 }
 
 function filterTitle(settings: ExtensionSettings) {
@@ -725,8 +801,8 @@ function ProblemRow({
   /* Solved and upsolved look the same (green); only the label tells them apart. */
   const statusFill = status === 'unsolved' ? 'transparent' : look.solved;
   const statusText = status === 'unsolved' ? theme.muted : look.solvedText;
-  const problemUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
-  const sourceLabel = source === 'category' ? 'in-contest' : 'practice';
+  const problemUrl = `https://codeforces.com/${problem.contestId >= 100001 ? 'gym' : 'contest'}/${problem.contestId}/problem/${problem.index}`;
+  const sourceLabel = source === 'category' ? 'in-contest' : source === 'practice' ? 'practice' : 'all submissions';
   const { ids, verdicts } = collectSubmissions(problem, theme);
   const tagText = problem.tags.slice(0, 3).join(', ') + (problem.tags.length > 3 ? ` +${problem.tags.length - 3}` : '');
 

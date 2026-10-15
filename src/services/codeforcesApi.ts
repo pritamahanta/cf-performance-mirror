@@ -25,6 +25,8 @@ import {
 } from '../domain/profileLocales';
 
 import { parseSolvedCounts } from '../domain/solvedCounts';
+import { parseProblemMetadata } from '../domain/problemLists';
+import type { ListProblemMeta } from '../domain/problemLists';
 import { withDeadline } from './deadline';
 import { getLoggedInHandle } from './onlineStore';
 
@@ -272,6 +274,34 @@ export async function fetchProblemSolvedCounts(): Promise<
 
   return parseSolvedCounts(
     data.result,
+  );
+}
+
+/*
+ * Name, rating and tags of the wanted problems ("<contestId>-<index>"),
+ * from the public problemset (one large call, made only when an imported
+ * list has problems that were not looked up yet). A problem Codeforces'
+ * problemset does not hold (a gym problem, say) is simply absent.
+ */
+export async function fetchProblemMetadata(
+  wanted: ReadonlySet<string>,
+): Promise<
+  Record<string, ListProblemMeta>
+> {
+  const data =
+    await get<unknown>(
+      '/problemset.problems',
+    );
+
+  if (data.status !== 'OK') {
+    throw new Error(
+      data.comment || 'unknown',
+    );
+  }
+
+  return parseProblemMetadata(
+    data.result,
+    wanted,
   );
 }
 

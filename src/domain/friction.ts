@@ -14,7 +14,7 @@ export const ALL_CF_TAGS = [
   'two pointers',
 ];
 
-export type FrictionSource = 'category' | 'practice';
+export type FrictionSource = 'category' | 'practice' | 'list';
 
 export interface FrictionFilters {
   hideAC: boolean;
@@ -39,6 +39,7 @@ export interface FrictionViewState {
 }
 
 export function getFrictionProblems(modeData: ModeData, category: Category, source: FrictionSource): ProblemEntry[] {
+  if (source === 'list') return [];
   return source === 'category'
     ? (modeData.categoryRawProblems?.[category] || [])
     : (modeData.practiceRawProblems || []);

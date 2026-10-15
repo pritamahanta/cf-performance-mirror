@@ -712,6 +712,9 @@ export function PerformanceMirror({
             )}
 
             <FrictionPanel
+              engine={
+                engine
+              }
               modeData={
                 problemsModeData
               }
