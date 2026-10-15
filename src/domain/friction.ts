@@ -111,6 +111,30 @@ export function buildSubmissionUrl(
   return `https://codeforces.com/${path}/${resolvedContestId}/submission/${submissionId}`;
 }
 
+/*
+ * The order submissions are listed in: newest first. "Newest" is the same
+ * notion as before, only reversed: by how far into its contest each one was
+ * made (submissions outside any contest, which have no such offset, count as
+ * the newest), or, with `byContest`, by when its contest started; the
+ * submission id breaks ties.
+ */
+export function sortSubmissionIds(
+  ids: readonly number[],
+  timingMap?: Map<number, SubmissionTiming>,
+  byContest = false,
+): number[] {
+  const oldestFirst = ids.slice().sort((a, b) => {
+    if (byContest) {
+      const sa = timingMap?.get(a)?.contestStart ?? Number.POSITIVE_INFINITY;
+      const sb = timingMap?.get(b)?.contestStart ?? Number.POSITIVE_INFINITY;
+      return (sa - sb) || (a - b);
+    }
+    return (submissionSortKey(a, timingMap) - submissionSortKey(b, timingMap)) || (a - b);
+  });
+
+  return oldestFirst.reverse();
+}
+
 export function submissionSortKey(
   id: number,
   timingMap?: Map<number, SubmissionTiming>,

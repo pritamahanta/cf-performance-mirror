@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { buildSubmissionUrl, submissionSortKey } from '../../domain/friction';
+import { buildSubmissionUrl, sortSubmissionIds } from '../../domain/friction';
 import type { SubmissionTiming } from '../../types/performance';
 import type { Theme } from '../../domain/theme';
 import { SubmissionSourceOverlay } from '../SubmissionSourceOverlay';
@@ -114,14 +114,11 @@ export function SubmissionPopup({
     };
   }, [anchor, onClose]);
 
-  const sortedIds = useMemo(() => ids.slice().sort((a, b) => {
-    if (crossContest && crossContestSort === 'contest') {
-      const sa = timingMap.get(a)?.contestStart ?? Number.POSITIVE_INFINITY;
-      const sb = timingMap.get(b)?.contestStart ?? Number.POSITIVE_INFINITY;
-      return (sa - sb) || (a - b);
-    }
-    return (submissionSortKey(a, timingMap) - submissionSortKey(b, timingMap)) || (a - b);
-  }), [ids, timingMap, crossContest, crossContestSort]);
+  /* Newest first. */
+  const sortedIds = useMemo(
+    () => sortSubmissionIds(ids, timingMap, crossContest && crossContestSort === 'contest'),
+    [ids, timingMap, crossContest, crossContestSort],
+  );
 
   const style: CSSProperties = {
     position: 'fixed', zIndex: 999999, borderRadius: 7, overflow: 'hidden',
@@ -152,8 +149,8 @@ export function SubmissionPopup({
               marginLeft: 'auto', flexShrink: 0, borderRadius: 3, height: 20, whiteSpace: 'nowrap',
             }}
             title={crossContestSort === 'contest'
-              ? 'Sorted by contest date — click for submission time'
-              : 'Sorted by submission time — click for contest order'}
+              ? 'Sorted by contest date, newest first — click for submission time'
+              : 'Sorted by submission time, newest first — click for contest order'}
             onClick={(event: MouseEvent<HTMLButtonElement>) => {
               event.stopPropagation();
               onCrossContestSortChange?.(crossContestSort === 'contest' ? 'time' : 'contest');
@@ -220,7 +217,7 @@ export function SubmissionPopup({
                   <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400, fontStyle: 'italic', opacity: 0.7 }}>solved outside contest</span>
                 ) : null}
               </div>
-              <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400, flexShrink: 0 }}>#{index + 1}</span>
+              <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400, flexShrink: 0 }}>#{sortedIds.length - index}</span>
             </>
           );
 
