@@ -131,11 +131,15 @@ export function buildSubmissionUrl(
  * made (submissions outside any contest, which have no such offset, count as
  * the newest), or, with `byContest`, by when its contest started; the
  * submission id breaks ties.
+ *
+ * With `ascending` the very same order is returned reversed: the smallest
+ * time (or the oldest contest) first. The Timings boxes list that way.
  */
 export function sortSubmissionIds(
   ids: readonly number[],
   timingMap?: Map<number, SubmissionTiming>,
   byContest = false,
+  ascending = false,
 ): number[] {
   const oldestFirst = ids.slice().sort((a, b) => {
     if (byContest) {
@@ -146,7 +150,7 @@ export function sortSubmissionIds(
     return (submissionSortKey(a, timingMap) - submissionSortKey(b, timingMap)) || (a - b);
   });
 
-  return oldestFirst.reverse();
+  return ascending ? oldestFirst : oldestFirst.reverse();
 }
 
 export function submissionSortKey(

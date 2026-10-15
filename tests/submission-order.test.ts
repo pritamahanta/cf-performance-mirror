@@ -25,6 +25,29 @@ test('submission order: by contest, the latest contest first, then newest within
   assert.deepEqual(sortSubmissionIds([11, 21, 12], timing, true), [21, 12, 11]);
 });
 
+test('submission order, ascending: the smallest time first within a contest', () => {
+  assert.deepEqual(sortSubmissionIds([12, 11, 13], timing, false, true), [11, 12, 13]);
+});
+
+test('submission order, ascending: ones made outside any contest (no timing) come last, oldest id first', () => {
+  assert.deepEqual(sortSubmissionIds([11, 40, 13, 41], timing, false, true), [11, 13, 40, 41]);
+});
+
+test('submission order, ascending: by contest, the oldest contest first', () => {
+  assert.deepEqual(sortSubmissionIds([11, 21, 12], timing, true, true), [11, 12, 21]);
+});
+
+test('submission order, ascending is exactly the reverse of the default', () => {
+  const ids = [13, 40, 11, 21, 12, 41];
+
+  for (const byContest of [false, true]) {
+    assert.deepEqual(
+      sortSubmissionIds(ids, timing, byContest, true),
+      sortSubmissionIds(ids, timing, byContest).reverse(),
+    );
+  }
+});
+
 test('submission order: works without any timing at all (newest id first) and does not change its input', () => {
   const ids = [3, 1, 2];
 

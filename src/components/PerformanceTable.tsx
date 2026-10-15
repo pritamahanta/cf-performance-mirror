@@ -424,6 +424,7 @@ export function PerformanceTable({
           theme={theme}
           crossContest
           crossContestSort={popupSort}
+          ascending
           anchor={popup.anchor}
           onCrossContestSortChange={onPopupSortChange}
           onClose={() => setPopup(null)}

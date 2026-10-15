@@ -35,6 +35,8 @@ interface Props {
   theme: Theme;
   crossContest?: boolean;
   crossContestSort: 'time' | 'contest';
+  /* List the smallest time / oldest contest first instead of the newest first (the Timings boxes). */
+  ascending?: boolean;
   anchor: HTMLElement;
   /* The one problem every id in `ids` belongs to - for the source overlay's header. */
   problemIndex?: string;
@@ -46,7 +48,7 @@ interface Props {
 
 export function SubmissionPopup({
   label, ids, verdicts, contestId, badgeBg, badgeFg, timingMap, contestMap, theme,
-  crossContest = false, crossContestSort, anchor, problemIndex, problemName, problemContestName,
+  crossContest = false, crossContestSort, ascending = false, anchor, problemIndex, problemName, problemContestName,
   onCrossContestSortChange, onClose,
 }: Props) {
   const popupRef = useRef<HTMLDivElement>(null);
@@ -114,10 +116,10 @@ export function SubmissionPopup({
     };
   }, [anchor, onClose]);
 
-  /* Newest first. */
+  /* Newest first, or the other way round when `ascending`. */
   const sortedIds = useMemo(
-    () => sortSubmissionIds(ids, timingMap, crossContest && crossContestSort === 'contest'),
-    [ids, timingMap, crossContest, crossContestSort],
+    () => sortSubmissionIds(ids, timingMap, crossContest && crossContestSort === 'contest', ascending),
+    [ids, timingMap, crossContest, crossContestSort, ascending],
   );
 
   const style: CSSProperties = {
@@ -149,8 +151,8 @@ export function SubmissionPopup({
               marginLeft: 'auto', flexShrink: 0, borderRadius: 3, height: 20, whiteSpace: 'nowrap',
             }}
             title={crossContestSort === 'contest'
-              ? 'Sorted by contest date, newest first — click for submission time'
-              : 'Sorted by submission time, newest first — click for contest order'}
+              ? `Sorted by contest date, ${ascending ? 'oldest' : 'newest'} first — click for submission time`
+              : `Sorted by submission time, ${ascending ? 'smallest' : 'newest'} first — click for contest order`}
             onClick={(event: MouseEvent<HTMLButtonElement>) => {
               event.stopPropagation();
               onCrossContestSortChange?.(crossContestSort === 'contest' ? 'time' : 'contest');
@@ -217,7 +219,7 @@ export function SubmissionPopup({
                   <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400, fontStyle: 'italic', opacity: 0.7 }}>solved outside contest</span>
                 ) : null}
               </div>
-              <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400, flexShrink: 0 }}>#{sortedIds.length - index}</span>
+              <span style={{ fontSize: 10, color: theme.muted, fontWeight: 400, flexShrink: 0 }}>#{ascending ? index + 1 : sortedIds.length - index}</span>
             </>
           );
 
