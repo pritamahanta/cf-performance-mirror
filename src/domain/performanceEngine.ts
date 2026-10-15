@@ -243,9 +243,24 @@ export class PerformanceEngine {
     });
 
     const everAC = new Set<string>();
+    const acInContest = new Set<string>();
     this.rawSubmissions.forEach(submission => {
       if (submission.verdict === 'OK' && submission.problem && typeof submission.problem.contestId === 'number') {
-        everAC.add(`${submission.problem.contestId}-${submission.problem.index}`);
+        const pid = `${submission.problem.contestId}-${submission.problem.index}`;
+        everAC.add(pid);
+
+        const contest = this.contestMap[submission.problem.contestId];
+        const submittedAt = submission.creationTimeSeconds;
+        if (
+          contest &&
+          typeof contest.startTimeSeconds === 'number' &&
+          typeof contest.durationSeconds === 'number' &&
+          typeof submittedAt === 'number' &&
+          submittedAt >= contest.startTimeSeconds &&
+          submittedAt <= contest.startTimeSeconds + contest.durationSeconds
+        ) {
+          acInContest.add(pid);
+        }
       }
     });
 
@@ -274,6 +289,7 @@ export class PerformanceEngine {
       rating: submission.problem.rating || null,
       tags: (submission.problem.tags || []).slice(),
       solved: everAC.has(`${submission.problem.contestId}-${submission.problem.index}`),
+      solvedInContest: acInContest.has(`${submission.problem.contestId}-${submission.problem.index}`),
       wa: 0, tle: 0, rte: 0, mle: 0, other: 0,
       acIds: [], waIds: [], tleIds: [], rteIds: [], mleIds: [], otherIds: [],
     });

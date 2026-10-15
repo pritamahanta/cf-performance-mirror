@@ -14,6 +14,12 @@ export interface ProblemEntry {
   rating: number | null;
   tags: string[];
   solved: boolean;
+  /*
+   * Whether the problem was accepted while its contest was running (judged by
+   * the submission's time, over every submission, whatever period is shown).
+   * `solved` without this means it was solved only after the contest.
+   */
+  solvedInContest: boolean;
   wa: number;
   tle: number;
   rte: number;

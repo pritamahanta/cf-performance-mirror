@@ -10,6 +10,7 @@ import {
   getAvailableTags,
   getFrictionProblems,
   getProblemSubmissions,
+  solveStatus,
   sortFrictionProblems,
   type FrictionFilters,
   type FrictionSource,
@@ -629,8 +630,8 @@ function gridColumns(hideRatings: boolean): string {
  */
 function tableLook(theme: Theme) {
   return theme.isDark
-    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText }
-    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20' };
+    ? { line: theme.borderLight, zebra: 'rgba(255,255,255,0.03)', head: theme.bg, solved: theme.solvedBadge, solvedText: theme.solvedBadgeText, upsolved: theme.tleBg, upsolvedText: theme.tleFg }
+    : { line: '#e1e1e1', zebra: '#f8f8f8', head: '#ffffff', solved: '#d4edc9', solvedText: '#1b5e20', upsolved: '#ffecb3', upsolvedText: '#7a4b00' };
 }
 
 /* Links look like Codeforces links: blue and underlined, purple once visited (see .cfpm-prob-link). */
@@ -720,6 +721,10 @@ function ProblemRow({
 }) {
   const errors = totalErrors(problem);
   const look = tableLook(theme);
+  const status = solveStatus(problem);
+  /* Solved during the contest is green, solved only after it is amber. */
+  const statusFill = status === 'contest' ? look.solved : status === 'after' ? look.upsolved : 'transparent';
+  const statusText = status === 'contest' ? look.solvedText : status === 'after' ? look.upsolvedText : theme.muted;
   const problemUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
   const sourceLabel = source === 'category' ? 'in-contest' : 'practice';
   const { ids, verdicts } = collectSubmissions(problem, theme);
@@ -733,8 +738,8 @@ function ProblemRow({
     minHeight: 36,
     padding: '4px 10px',
     boxSizing: 'border-box',
-    /* Solved rows carry the same green edge Codeforces gives them. */
-    borderLeft: `5px solid ${problem.solved ? look.solved : 'transparent'}`,
+    /* Solved rows carry the same green edge Codeforces gives them (amber when solved only after the contest). */
+    borderLeft: `5px solid ${statusFill}`,
     borderTop: index > 0 ? `1px solid ${look.line}` : undefined,
     background: index % 2 === 0 ? look.zebra : 'transparent',
     width: '100%',
@@ -847,9 +852,13 @@ function ProblemRow({
         </button>
       </span>
 
-      {/* Status: a solved row's cell is filled green, like Codeforces' solved marker */}
+      {/* Status: a solved row's cell is filled green, like Codeforces' solved marker; amber when it was solved only after the contest */}
       <span
-        title={problem.solved ? (problem.acIds.length ? 'Solved' : "Solved (but that accepted submission isn't included in the dates or contest type you're currently viewing)") : 'Not yet solved'}
+        title={
+          status === 'unsolved'
+            ? 'Not yet solved'
+            : `${status === 'contest' ? 'Solved during the contest' : 'Solved after the contest (upsolved)'}${problem.acIds.length ? '' : " (but that accepted submission isn't included in the dates or contest type you're currently viewing)"}`
+        }
         style={{
           alignSelf: 'stretch',
           margin: '-4px 0',
@@ -858,11 +867,11 @@ function ProblemRow({
           justifyContent: 'center',
           fontSize: 12,
           fontWeight: problem.solved ? 700 : 400,
-          color: problem.solved ? look.solvedText : theme.muted,
-          background: problem.solved ? look.solved : 'transparent',
+          color: statusText,
+          background: statusFill,
         }}
       >
-        {problem.solved ? 'Solved' : 'Unsolved'}
+        {status === 'contest' ? 'Solved' : status === 'after' ? 'Upsolved' : 'Unsolved'}
       </span>
     </div>
   );

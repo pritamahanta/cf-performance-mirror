@@ -73,6 +73,18 @@ export function filterFrictionProblems(
     });
 }
 
+export type SolveStatus = 'contest' | 'after' | 'unsolved';
+
+/*
+ * When a problem was solved: 'contest' (accepted while its contest was
+ * running), 'after' (accepted, but only after the contest ended) or
+ * 'unsolved'.
+ */
+export function solveStatus(problem: Pick<ProblemEntry, 'solved' | 'solvedInContest'>): SolveStatus {
+  if (!problem.solved) return 'unsolved';
+  return problem.solvedInContest ? 'contest' : 'after';
+}
+
 export function sortFrictionProblems(problems: readonly ProblemEntry[], sort: 'errors' | 'rating'): ProblemEntry[] {
   return [...problems].sort((a, b) => sort === 'rating'
     ? (b.rating || 0) - (a.rating || 0)
